@@ -4,9 +4,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template
+from werkzeug.security import generate_password_hash
 
 from app.cli import register_cli
-from app.database import close_db, init_db
+from app.database import close_db, get_db, init_db
+from app.utils.helpers import new_id, now_iso
 
 
 def create_app(test_config=None):
@@ -42,6 +44,7 @@ def create_app(test_config=None):
             "EXAMFORGE_SECRET_KEY",
             "dev-only-change-me",
         ),
+
         MAX_UPLOAD_BYTES=(
             int(
                 os.getenv(
@@ -52,11 +55,14 @@ def create_app(test_config=None):
             * 1024
             * 1024
         ),
+
         UPLOAD_DIR=str(UPLOAD_DIR),
 
         # Session security
         SESSION_COOKIE_HTTPONLY=True,
+
         SESSION_COOKIE_SAMESITE="Lax",
+
         SESSION_COOKIE_SECURE=(
             os.getenv(
                 "EXAMFORGE_SECURE_COOKIE",
@@ -70,6 +76,7 @@ def create_app(test_config=None):
             "EXAMFORGE_TIMEZONE",
             "Asia/Kolkata",
         ),
+
         JSON_SORT_KEYS=False,
     )
 
@@ -109,6 +116,90 @@ def create_app(test_config=None):
 
     with app.app_context():
         init_db()
+
+    # ---------------------------------------------------------
+    # Initial Admin Bootstrap
+    #
+    # Creates the first admin automatically when:
+    #
+    # EXAMFORGE_ADMIN_NAME
+    # EXAMFORGE_ADMIN_EMAIL
+    # EXAMFORGE_ADMIN_PASSWORD
+    #
+    # are configured.
+    #
+    # IMPORTANT:
+    # Existing admin accounts are NEVER overwritten.
+    # ---------------------------------------------------------
+    admin_name = os.getenv(
+        "EXAMFORGE_ADMIN_NAME"
+    )
+
+    admin_email = os.getenv(
+        "EXAMFORGE_ADMIN_EMAIL"
+    )
+
+    admin_password = os.getenv(
+        "EXAMFORGE_ADMIN_PASSWORD"
+    )
+
+    if (
+        admin_name
+        and admin_email
+        and admin_password
+    ):
+        with app.app_context():
+            db = get_db()
+
+            existing_admin = db.execute(
+                """
+                SELECT id
+                FROM admins
+                WHERE lower(email) = lower(?)
+                LIMIT 1
+                """,
+                (
+                    admin_email.strip(),
+                ),
+            ).fetchone()
+
+            if not existing_admin:
+
+                timestamp = now_iso()
+
+                db.execute(
+                    """
+                    INSERT INTO admins (
+                        id,
+                        name,
+                        email,
+                        password_hash,
+                        active,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        new_id(),
+                        admin_name.strip(),
+                        admin_email.strip().lower(),
+                        generate_password_hash(
+                            admin_password,
+                            method="scrypt",
+                        ),
+                        1,
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+
+                db.commit()
+
+                app.logger.info(
+                    "Initial ExamForge admin created: %s",
+                    admin_email,
+                )
 
     # ---------------------------------------------------------
     # Register Flask CLI commands
@@ -160,7 +251,9 @@ def create_app(test_config=None):
     # ---------------------------------------------------------
     @app.get("/")
     def home():
-        return render_template("login.html")
+        return render_template(
+            "login.html"
+        )
 
     @app.get("/admin/<page>")
     def admin_page(page):
@@ -255,8 +348,9 @@ def create_app(test_config=None):
             error="Internal server error",
         ), 500
 
-    # Catch unexpected exceptions without exposing
-    # Python stack traces to normal users.
+    # ---------------------------------------------------------
+    # Catch unexpected exceptions
+    # ---------------------------------------------------------
     @app.errorhandler(Exception)
     def internal_exception(error):
         logging.exception(
