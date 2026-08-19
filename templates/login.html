@@ -1,0 +1,37 @@
+{% extends 'base.html' %}{% block body %}
+<main class="auth-shell">
+  <section class="brand-card">
+    <div class="brand-mark">EF</div>
+    <h1>ExamForge</h1>
+    <p>Online examination management, evaluation, and result delivery.</p>
+    <div class="feature-list">
+      <span>Question banks</span><span>Secure invitations</span
+      ><span>Automatic evaluation</span><span>Result cards</span>
+    </div>
+  </section>
+  <section class="auth-card">
+    <h2>Administrator / Teacher</h2>
+    <p class="muted">Sign in to manage examinations.</p>
+    <form id="loginForm">
+      <label>Email<input id="email" type="email" required /></label
+      ><label>Password<input id="password" type="password" required /></label
+      ><button class="primary" type="submit">Sign in</button>
+    </form>
+    <div class="setup-note">
+      <strong>First run?</strong><br />Use
+      <code>flask --app run.py create-admin</code> to create the first admin.
+    </div>
+  </section>
+</main>
+{% endblock %}{% block scripts %}
+<script>
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await api("/api/auth/login", "POST", {
+      email: email.value,
+      password: password.value,
+    });
+    if (r.user) location = "/admin/dashboard";
+  });
+</script>
+{% endblock %}

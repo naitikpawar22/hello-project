@@ -1,0 +1,75 @@
+{% extends 'base.html' %}{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+  <main class="content">
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">MANUAL AUTHORING</span>
+        <h1>Blank Exam Builder</h1>
+        <p class="muted">
+          Create questions manually, then create the exam from them.
+        </p>
+      </div>
+      <button class="primary" id="create">Create blank exam</button>
+    </header>
+    <section class="panel form-grid">
+      <label>Exam title<input id="title" value="New Blank Exam" /></label
+      ><label>Duration<input id="duration" type="number" value="60" /></label
+      ><label>Pass %<input id="pass" type="number" value="40" /></label
+      ><label>Description<textarea id="desc"></textarea></label>
+    </section>
+    <section id="qs" class="stack"></section>
+    <button class="ghost" id="add">+ Add question</button>
+  </main>
+</div>
+{% endblock %}{% block scripts %}
+<script>
+  let questionsData = [];
+  function card(q, i) {
+    return `<article class="panel"><div class="question-head"><span class="badge">Question ${i + 1}</span><button class="ghost danger" onclick="removeQ(${i})">Remove</button></div><textarea data-field="text" placeholder="Question text">${escapeHtml(q.text || "")}</textarea><div class="four-grid">${[0, 1, 2, 3].map((j) => `<input data-opt="${j}" placeholder="Option ${String.fromCharCode(65 + j)}" value="${escapeHtml(q.options[j] || "")}">`).join("")}</div><div class="four-grid"><select data-field="type"><option ${q.type === "MCQ" ? "selected" : ""}>MCQ</option><option ${q.type === "MSQ" ? "selected" : ""}>MSQ</option></select><input data-field="correct" placeholder="Correct indexes e.g. 0 or 0,2" value="${q.correct || ""}"><input data-field="marks" type="number" min="0" value="${q.marks || 1}"><input data-field="negative" type="number" min="0" value="${q.negative || 0}"></div><input data-field="topic" placeholder="Topic" value="${escapeHtml(q.topic || "")}"><textarea data-field="explanation" placeholder="Explanation">${escapeHtml(q.explanation || "")}</textarea></article>`;
+  }
+  function render() {
+    qs.innerHTML = questionsData.map(card).join("");
+  }
+  function sync() {
+    questionsData = [...qs.children].map((a) => {
+      const opts = [...a.querySelectorAll("[data-opt]")].map((x) => x.value);
+      return {
+        text: a.querySelector("[data-field=text]").value,
+        options: opts,
+        type: a.querySelector("[data-field=type]").value,
+        correct: a.querySelector("[data-field=correct]").value,
+        marks: a.querySelector("[data-field=marks]").value,
+        negative: a.querySelector("[data-field=negative]").value,
+        topic: a.querySelector("[data-field=topic]").value,
+        explanation: a.querySelector("[data-field=explanation]").value,
+      };
+    });
+  }
+  function removeQ(i) {
+    sync();
+    questionsData.splice(i, 1);
+    render();
+  }
+  add.onclick = () => {
+    sync();
+    questionsData.push({ options: [] });
+    render();
+  };
+  create.onclick = async () => {
+    sync();
+    const r = await api("/api/exams/blank", "POST", {
+      title: title.value,
+      description: desc.value,
+      duration_minutes: +duration.value,
+      pass_percentage: +pass.value,
+      questions: questionsData,
+    });
+    if (r.id) location = "/admin/scheduling?exam=" + r.id;
+  };
+  requireAuth().then(() => {
+    questionsData.push({ options: [] });
+    render();
+  });
+</script>
+{% endblock %}

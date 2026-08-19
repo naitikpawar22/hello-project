@@ -1,0 +1,52 @@
+{% extends 'base.html' %}{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+  <main class="content">
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">ACCESS</span>
+        <h1>Invitations</h1>
+      </div>
+    </header>
+    <section class="panel form-grid">
+      <label>Exam<select id="exam"></select></label
+      ><label
+        >Emails<textarea
+          id="emails"
+          placeholder="one@example.com, two@example.com"
+        ></textarea></label
+      ><button class="primary" id="send">Create & queue invitations</button>
+    </section>
+    <section class="panel"><div id="invites"></div></section>
+  </main>
+</div>
+{% endblock %}{% block scripts %}
+<script>
+  requireAuth().then(load);
+  async function load() {
+    const d = await api("/api/exams");
+    exam.innerHTML = d.exams
+      .map((e) => `<option value="${e.id}">${escapeHtml(e.title)}</option>`)
+      .join("");
+    refresh();
+  }
+  async function refresh() {
+    const d = await api("/api/exams/" + exam.value + "/invitations");
+    invites.innerHTML = table(d.invitations, [
+      "email",
+      "status",
+      "created_at",
+      "sent_at",
+    ]);
+  }
+  send.onclick = async () => {
+    const list = emails.value.split(/[\s,;]+/).filter(Boolean);
+    await api("/api/exams/" + exam.value + "/invitations/bulk", "POST", {
+      emails: list,
+    });
+    emails.value = "";
+    refresh();
+  };
+  exam.onchange = refresh;
+</script>
+{% endblock %}

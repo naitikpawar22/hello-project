@@ -1,0 +1,654 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+
+  <main class="content">
+
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">EXAM CREATION</span>
+
+        <h1>Normal Exam Builder</h1>
+
+        <p class="muted">
+          Select existing bank questions and configure scoring,
+          access and security.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-primary"
+        id="create"
+      >
+        Create exam
+      </button>
+    </header>
+
+
+    <!-- Exam configuration -->
+    <section class="panel form-grid">
+
+      <label>
+        Title
+        <input
+          id="title"
+          required
+          placeholder="e.g. HTML & CSS Assessment"
+        />
+      </label>
+
+
+      <label>
+        Duration (minutes)
+        <input
+          id="duration"
+          type="number"
+          min="1"
+          value="60"
+          required
+        />
+      </label>
+
+
+      <label>
+        Pass percentage
+        <input
+          id="passPct"
+          type="number"
+          min="0"
+          max="100"
+          value="40"
+          required
+        />
+      </label>
+
+
+      <label>
+        Description
+        <textarea
+          id="desc"
+          placeholder="Optional exam description"
+        ></textarea>
+      </label>
+
+
+      <label class="check">
+        <input
+          id="rq"
+          type="checkbox"
+        />
+        Randomize questions
+      </label>
+
+
+      <label class="check">
+        <input
+          id="ro"
+          type="checkbox"
+        />
+        Randomize options
+      </label>
+
+
+      <!-- Access mode -->
+      <label>
+        Exam access
+
+        <select id="accessMode">
+
+          <option value="PRIVATE">
+            Private - Invitation only
+          </option>
+
+          <option value="PUBLIC">
+            Public - Exam Code / QR
+          </option>
+
+        </select>
+
+        <small class="muted">
+          Private exams use student-specific invitations.
+          Public exams can be opened using the exam code or QR code.
+        </small>
+
+      </label>
+
+    </section>
+
+
+    <!-- Question selection -->
+    <section class="panel">
+
+      <h2>Select questions</h2>
+
+      <select id="bankSelect">
+
+        <option value="">
+          Choose a bank
+        </option>
+
+      </select>
+
+      <div
+        id="questions"
+        class="select-list"
+      ></div>
+
+    </section>
+
+
+    <!-- Exam created result -->
+    <section
+      id="createdExam"
+      class="panel"
+      hidden
+    >
+
+      <h2>Exam Created Successfully</h2>
+
+      <div class="result-grid">
+
+        <dt>Exam</dt>
+        <dd id="createdExamTitle">-</dd>
+
+        <dt>Exam Code</dt>
+        <dd id="createdExamCode">-</dd>
+
+        <dt>Exam Link</dt>
+        <dd>
+          <div class="inline-form">
+
+            <input
+              id="createdExamLink"
+              readonly
+            />
+
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              id="copyExamLink"
+            >
+              Copy Link
+            </button>
+
+          </div>
+        </dd>
+
+        <dt>Access Mode</dt>
+        <dd id="createdAccessMode">-</dd>
+
+      </div>
+
+
+      <div
+        id="qrSection"
+        class="panel"
+        hidden
+      >
+
+        <h3>Exam QR Code</h3>
+
+        <p class="muted">
+          Students can scan this QR code to open the exam.
+        </p>
+
+        <img
+          id="examQr"
+          alt="Exam QR Code"
+          style="max-width:220px;"
+        />
+
+      </div>
+
+
+      <div class="dialog-actions">
+
+        <button
+          type="button"
+          class="btn btn-secondary"
+          id="scheduleExam"
+        >
+          Continue to Scheduling
+        </button>
+
+      </div>
+
+    </section>
+
+  </main>
+
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+
+  let qs = [];
+  let createdExamId = null;
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | Authentication
+  |--------------------------------------------------------------------------
+  */
+
+  requireAuth().then(loadBanks);
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | Load question banks
+  |--------------------------------------------------------------------------
+  */
+
+  async function loadBanks() {
+
+    const d = await api(
+      "/api/question-banks"
+    );
+
+    bankSelect.innerHTML =
+      '<option value="">Choose a bank</option>' +
+      d.question_banks
+        .map(
+          (b) => `
+            <option value="${escapeHtml(b.id)}">
+              ${escapeHtml(b.name)}
+            </option>
+          `
+        )
+        .join("");
+
+  }
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | Load questions from selected bank
+  |--------------------------------------------------------------------------
+  */
+
+  bankSelect.onchange = async () => {
+
+    if (!bankSelect.value) {
+
+      questions.innerHTML = "";
+
+      return;
+    }
+
+
+    const d = await api(
+      "/api/question-banks/" +
+      encodeURIComponent(bankSelect.value)
+    );
+
+
+    qs =
+      d.question_bank.questions || [];
+
+
+    if (!qs.length) {
+
+      questions.innerHTML =
+        empty(
+          "No questions available in this bank."
+        );
+
+      return;
+    }
+
+
+    questions.innerHTML = qs
+      .map(
+        (q, i) => `
+
+          <label class="select-row">
+
+            <input
+              type="checkbox"
+              value="${escapeHtml(q.id)}"
+            />
+
+            <span>
+
+              <b>
+                ${i + 1}.
+                ${escapeHtml(q.text)}
+              </b>
+
+              <small>
+                ${escapeHtml(q.marks)}
+                marks ·
+                ${escapeHtml(q.type)}
+              </small>
+
+            </span>
+
+          </label>
+
+        `
+      )
+      .join("");
+
+  };
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | Create exam
+  |--------------------------------------------------------------------------
+  */
+
+  create.onclick = async () => {
+
+    const selected = [
+      ...document.querySelectorAll(
+        "#questions input:checked"
+      ),
+    ].map(
+      (x) => x.value
+    );
+
+
+    /*
+    | Validation
+    */
+
+    if (!title.value.trim()) {
+
+      toast(
+        "Exam title is required.",
+        "error"
+      );
+
+      title.focus();
+
+      return;
+    }
+
+
+    if (+duration.value <= 0) {
+
+      toast(
+        "Duration must be greater than 0.",
+        "error"
+      );
+
+      duration.focus();
+
+      return;
+    }
+
+
+    if (
+      +passPct.value < 0 ||
+      +passPct.value > 100
+    ) {
+
+      toast(
+        "Pass percentage must be between 0 and 100.",
+        "error"
+      );
+
+      passPct.focus();
+
+      return;
+    }
+
+
+    if (!selected.length) {
+
+      toast(
+        "Select at least one question.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    /*
+    | Disable button while creating
+    */
+
+    create.disabled = true;
+    create.textContent = "Creating...";
+
+
+    try {
+
+      const r = await api(
+        "/api/exams",
+        "POST",
+        {
+          title: title.value.trim(),
+
+          description:
+            desc.value.trim(),
+
+          duration_minutes:
+            Number(duration.value),
+
+          pass_percentage:
+            Number(passPct.value),
+
+          randomize_questions:
+            rq.checked,
+
+          randomize_options:
+            ro.checked,
+
+          access_mode:
+            accessMode.value,
+
+          question_ids:
+            selected,
+        }
+      );
+
+
+      if (!r.id) {
+
+        toast(
+          "Exam creation failed.",
+          "error"
+        );
+
+        return;
+      }
+
+
+      /*
+      | Store exam ID
+      */
+
+      createdExamId = r.id;
+
+
+      /*
+      | Show returned exam details
+      |
+      | These fields require backend support.
+      */
+
+      createdExamTitle.textContent =
+        r.title ||
+        title.value.trim();
+
+
+      createdExamCode.textContent =
+        r.exam_code ||
+        "Generating...";
+
+
+      createdAccessMode.textContent =
+        r.access_mode ||
+        accessMode.value;
+
+
+      /*
+      | Exam URL
+      */
+
+      if (r.exam_link) {
+
+        createdExamLink.value =
+          r.exam_link;
+
+      } else if (r.exam_code) {
+
+        createdExamLink.value =
+          `${window.location.origin}/exam/${encodeURIComponent(
+            r.exam_code
+          )}`;
+
+      } else {
+
+        createdExamLink.value =
+          "Exam link will be available after backend update.";
+
+      }
+
+
+      /*
+      | QR
+      */
+
+      if (r.qr_code) {
+
+        examQr.src =
+          r.qr_code;
+
+        qrSection.hidden = false;
+
+      } else {
+
+        qrSection.hidden = true;
+
+      }
+
+
+      /*
+      | Display success panel
+      */
+
+      createdExam.hidden = false;
+
+
+      toast(
+        "Exam created successfully."
+      );
+
+
+      /*
+      | Scroll result into view
+      */
+
+      createdExam.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+
+    } catch (error) {
+
+      console.error(
+        "Exam creation failed:",
+        error
+      );
+
+    } finally {
+
+      create.disabled = false;
+      create.textContent = "Create exam";
+
+    }
+
+  };
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | Copy exam link
+  |--------------------------------------------------------------------------
+  */
+
+  copyExamLink.onclick = async () => {
+
+    const link =
+      createdExamLink.value.trim();
+
+
+    if (!link) {
+
+      toast(
+        "Exam link is not available.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    try {
+
+      await navigator.clipboard.writeText(
+        link
+      );
+
+      toast(
+        "Exam link copied."
+      );
+
+    } catch {
+
+      createdExamLink.select();
+
+      document.execCommand("copy");
+
+      toast(
+        "Exam link copied."
+      );
+
+    }
+
+  };
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | Continue to scheduling
+  |--------------------------------------------------------------------------
+  */
+
+  scheduleExam.onclick = () => {
+
+    if (!createdExamId) {
+
+      toast(
+        "Create an exam first.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    location.href =
+      "/admin/scheduling?exam=" +
+      encodeURIComponent(
+        createdExamId
+      );
+
+  };
+
+</script>
+
+{% endblock %}

@@ -1,0 +1,3 @@
+question,option_a,option_b,option_c,option_d,answer,type,marks,negative_marks,topic,explanation
+What is 2+2?,3,4,5,6,B,MCQ,2,0.5,Math,Two plus two equals four.
+Which are vowels?,A,B,E,X,"A,C",MSQ,3,1,English,"This example demonstrates MSQ."
