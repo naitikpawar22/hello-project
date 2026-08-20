@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {% extends 'base.html' %}
 
 {% block body %}
@@ -279,47 +278,5 @@
       </div>
     `;
   }
-
-  searchFilter.oninput = () => {
-    const q = searchFilter.value.trim().toLowerCase();
-    if (!q) {
-      renderResults(allResults);
-      return;
-    }
-    const filtered = allResults.filter((r) =>
-      (r.candidate_name || "").toLowerCase().includes(q) ||
-      (r.candidate_email || "").toLowerCase().includes(q) ||
-      (r.exam_title || "").toLowerCase().includes(q)
-    );
-    renderResults(filtered);
-  };
-=======
-{% extends 'base.html' %}{% block body %}
-<div class="app-shell">
-  {% include 'partials_nav.html' %}
-  <main class="content">
-    <header class="page-header">
-      <div>
-        <span class="eyebrow">OUTCOMES</span>
-        <h1>Results</h1>
-      </div>
-    </header>
-    <section class="panel"><div id="results"></div></section>
-  </main>
-</div>
-{% endblock %}{% block scripts %}
-<script>
-  requireAuth().then(loadResults);
-  async function loadResults() {
-    const d = await api("/api/results");
-    results.innerHTML =
-      d.results
-        .map(
-          (r) =>
-            `<div class="result-row"><div><b>${escapeHtml(r.candidate_name)}</b><div class="muted">${escapeHtml(r.exam_title)}</div></div><div>${r.percentage.toFixed(2)}% <span class="badge ${r.passed ? "ok" : "danger"}">${r.passed ? "PASS" : "FAIL"}</span></div><a href="/admin/results/${r.id}">View</a><a href="/api/results/${r.id}/pdf">PDF</a></div>`,
-        )
-        .join("") || empty("No results yet.");
-  }
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 </script>
 {% endblock %}

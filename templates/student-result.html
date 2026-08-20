@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {% extends 'base.html' %}
 
 {% block body %}
@@ -312,12 +311,5 @@
   }
 
   loadResult();
-=======
-{% extends 'base.html' %}{% block body %}
-<main class="result-shell"><div id="resultCard" class="panel"></div></main>
-{% endblock %}{% block scripts %}
-<script>
-  const rid={{ result_id|tojson }};async function load(){const d=await api('/api/results/public/'+rid+'/details');const r=d.result;resultCard.innerHTML=`<div class="result-brand">EXAMFORGE</div><h1>Result Card</h1><div class="result-hero"><div><div class="muted">Score</div><strong>${r.score.toFixed(2)} / ${r.max_marks.toFixed(2)}</strong></div><div><div class="muted">Percentage</div><strong>${r.percentage.toFixed(2)}%</strong></div><div><div class="muted">Status</div><span class="badge ${r.passed?'ok':'danger'}">${r.passed?'PASS':'FAIL'}</span></div></div><dl class="result-grid"><dt>Student</dt><dd>${escapeHtml(r.candidate_name)}</dd><dt>Exam</dt><dd>${escapeHtml(r.exam_title)}</dd><dt>Correct</dt><dd>${r.correct_count}</dd><dt>Wrong</dt><dd>${r.wrong_count}</dd><dt>Skipped</dt><dd>${r.skipped_count}</dd><dt>Time taken</dt><dd>${Math.floor(r.time_taken_seconds/60)}m ${r.time_taken_seconds%60}s</dd><dt>Security events</dt><dd>${r.security_event_count}</dd></dl><div class="topic-grid">${Object.entries(r.topic_performance).map(([k,v])=>`<div class="panel"><b>${escapeHtml(k)}</b><div>${v.score.toFixed(2)} / ${v.max_marks.toFixed(2)}</div><small>${v.correct} correct · ${v.wrong} wrong · ${v.skipped} skipped</small></div>`).join('')}</div><h2>Question review</h2><div class="stack">${r.details.map((d,i)=>`<article class="question-review"><div class="badge">Q${i+1} · ${d.status}</div><p>${escapeHtml(d.question)}</p><div class="muted">Selected: ${d.selected.length?d.selected.map(x=>String.fromCharCode(65+x)).join(', '):'Skipped'} · Correct: ${d.correct.map(x=>String.fromCharCode(65+x)).join(', ')} · ${d.marks_awarded>=0?'+':''}${d.marks_awarded}</div><p>${escapeHtml(d.explanation||'')}</p></article>`).join('')}</div><a class="primary inline-button" href="/api/results/${rid}/pdf">Download PDF result card</a>`;}load();
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 </script>
 {% endblock %}

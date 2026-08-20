@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {% extends 'base.html' %}
 
 {% block body %}
@@ -196,54 +195,4 @@
   }
 }
 </style>
-=======
-{% extends 'base.html' %}{% block body %}
-<div class="app-shell">
-  {% include 'partials_nav.html' %}
-  <main class="content">
-    <header class="page-header">
-      <div>
-        <span class="eyebrow">OVERVIEW</span>
-        <h1>Dashboard</h1>
-        <p class="muted">Live examination operations from SQLite.</p>
-      </div>
-    </header>
-    <section id="stats" class="stat-grid"></section>
-    <div class="two-col">
-      <section class="panel">
-        <h2>Recent attempts</h2>
-        <div id="recentAttempts"></div>
-      </section>
-      <section class="panel">
-        <h2>Upcoming exams</h2>
-        <div id="upcoming"></div>
-      </section>
-    </div>
-  </main>
-</div>
-{% endblock %}{% block scripts %}
-<script>
-  requireAuth().then(loadDashboard);
-  async function loadDashboard() {
-    const d = await api("/api/dashboard");
-    stats.innerHTML = Object.entries(d.stats)
-      .map(
-        ([k, v]) =>
-          `<div class="stat-card"><div class="stat-label">${labelize(k)}</div><div class="stat-value">${Number(v).toLocaleString()}</div></div>`,
-      )
-      .join("");
-    recentAttempts.innerHTML = table(d.recent_attempts, [
-      "candidate_name",
-      "title",
-      "percentage",
-      "passed",
-    ]);
-    upcoming.innerHTML = table(d.upcoming_exams, [
-      "title",
-      "start_at",
-      "end_at",
-    ]);
-  }
-</script>
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 {% endblock %}

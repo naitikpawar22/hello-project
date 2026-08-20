@@ -451,7 +451,6 @@ def get_exam(eid):
         (eid,),
     ).fetchall()
 
-<<<<<<< HEAD
     questions_list = []
     for q in questions:
         q_dict = dict(q)
@@ -471,22 +470,13 @@ def get_exam(eid):
         q_dict["correct"] = correct_list[0] if len(correct_list) == 1 else correct_list
         questions_list.append(q_dict)
 
-=======
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     result = {
         **dict(exam),
         "security_settings": json.loads(
             exam["security_settings"]
             or "{}"
         ),
-<<<<<<< HEAD
         "questions": questions_list,
-=======
-        "questions": [
-            dict(question)
-            for question in questions
-        ],
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     }
 
     return result

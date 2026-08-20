@@ -1,11 +1,7 @@
 from datetime import datetime, timezone, timedelta
 
 from app.database import get_db
-<<<<<<< HEAD
 from app.utils.helpers import new_id, now_iso, parse_iso
-=======
-from app.utils.helpers import new_id, now_iso
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 
 
 # ExamForge default timezone: India (IST)
@@ -189,13 +185,8 @@ def exam_window(eid):
         return None
 
     try:
-<<<<<<< HEAD
         start = parse_iso(row["start_at"])
         end = parse_iso(row["end_at"])
-=======
-        start = datetime.fromisoformat(row["start_at"])
-        end = datetime.fromisoformat(row["end_at"])
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     except (ValueError, TypeError):
         return None
 

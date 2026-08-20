@@ -202,6 +202,12 @@ def create_app(test_config=None):
                 )
 
     # ---------------------------------------------------------
+    # Initialize DoS & DDoS Attack Prevention Middleware
+    # ---------------------------------------------------------
+    from app.middleware.dos_protection import DoSProtection
+    dos_limiter = DoSProtection(app)
+
+    # ---------------------------------------------------------
     # Register Flask CLI commands
     # IMPORTANT:
     # app must already exist before calling register_cli(app)
@@ -237,14 +243,40 @@ def create_app(test_config=None):
     app.register_blueprint(dashboard_bp)
 
     # ---------------------------------------------------------
-    # Health endpoint
+    # Health & Security endpoints
     # ---------------------------------------------------------
     @app.get("/api/health")
     def health():
         return jsonify(
             status="ok",
             service="ExamForge",
+            dos_protection="active",
         )
+
+    @app.get("/api/security/dos-stats")
+    def dos_stats():
+        from app.utils.security import current_actor
+        actor = current_actor()
+        if not actor or actor.get("role") != "admin":
+            return jsonify(error="Admin access required"), 403
+        return jsonify(dos_limiter.get_stats())
+
+    @app.post("/api/security/unban-ip")
+    def unban_ip():
+        from flask import request
+        from app.utils.security import current_actor
+        actor = current_actor()
+        if not actor or actor.get("role") != "admin":
+            return jsonify(error="Admin access required"), 403
+        data = request.get_json(silent=True) or {}
+        ip = (data.get("ip") or "").strip()
+        if not ip:
+            return jsonify(error="IP address required"), 400
+        success = dos_limiter.unban_ip(ip)
+        if success:
+            return jsonify(message=f"IP {ip} unbanned successfully.")
+        return jsonify(message=f"IP {ip} was not currently banned."), 404
+
 
     # ---------------------------------------------------------
     # Frontend
@@ -255,7 +287,6 @@ def create_app(test_config=None):
             "login.html"
         )
 
-<<<<<<< HEAD
     @app.get("/admin")
     @app.get("/admin/")
     def admin_root():
@@ -268,15 +299,7 @@ def create_app(test_config=None):
             "dashboard",
             "students",
             "question-banks",
-=======
-    @app.get("/admin/<page>")
-    def admin_page(page):
-        allowed_pages = {
-            "dashboard",
-            "students",
-            "question-banks",
             "question-bank-detail",
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
             "exam-builder",
             "blank-exam-builder",
             "scheduling",
@@ -284,7 +307,6 @@ def create_app(test_config=None):
             "results",
         }
 
-<<<<<<< HEAD
         alias_map = {
             "questions": "question-banks",
         }
@@ -296,15 +318,6 @@ def create_app(test_config=None):
 
         return render_template(
             f"{target_page}.html",
-=======
-        if page not in allowed_pages:
-            return jsonify(
-                error="Page not found",
-            ), 404
-
-        return render_template(
-            f"{page}.html",
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         )
 
     @app.get("/student/exam/<token>")
@@ -314,7 +327,6 @@ def create_app(test_config=None):
             token=token,
         )
 
-<<<<<<< HEAD
     @app.get("/exam/<exam_code>")
     @app.get("/student/public/<exam_code>")
     @app.get("/student/public-exam/<exam_code>")
@@ -324,8 +336,6 @@ def create_app(test_config=None):
             exam_code=exam_code,
         )
 
-=======
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     @app.get("/student/result/<rid>")
     def student_result_page(rid):
         return render_template(
@@ -363,18 +373,12 @@ def create_app(test_config=None):
 
     @app.errorhandler(404)
     def not_found(_error):
-<<<<<<< HEAD
         from flask import request
         if request.path.startswith("/api/"):
             return jsonify(
                 error="Not found",
             ), 404
         return render_template("login.html"), 404
-=======
-        return jsonify(
-            error="Not found",
-        ), 404
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 
     @app.errorhandler(409)
     def conflict(_error):

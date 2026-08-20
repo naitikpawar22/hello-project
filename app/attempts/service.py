@@ -6,10 +6,7 @@ from app.database import get_db
 from app.utils.helpers import (
     new_id,
     now_iso,
-<<<<<<< HEAD
     parse_iso,
-=======
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     token_hash,
 )
 from app.evaluation.service import evaluate_attempt
@@ -49,11 +46,7 @@ def load_invitation(token):
 
     if invitation["expires_at"]:
 
-<<<<<<< HEAD
         expiry = parse_iso(
-=======
-        expiry = datetime.fromisoformat(
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
             invitation["expires_at"]
         )
 
@@ -110,19 +103,11 @@ def _validate_schedule(exam_id):
 
     now = datetime.now(timezone.utc)
 
-<<<<<<< HEAD
     start = parse_iso(
         schedule["start_at"]
     )
 
     end = parse_iso(
-=======
-    start = datetime.fromisoformat(
-        schedule["start_at"]
-    )
-
-    end = datetime.fromisoformat(
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         schedule["end_at"]
     )
 
@@ -523,7 +508,6 @@ def start_attempt(
         or invitation["email"]
     ).strip()
 
-<<<<<<< HEAD
     candidate_phone = (
         candidate.get("phone") or candidate.get("mobile") or ""
     ).strip()
@@ -536,8 +520,6 @@ def start_attempt(
         candidate.get("division") or candidate.get("div") or ""
     ).strip()
 
-=======
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     attempt_id = new_id()
 
     db.execute(
@@ -550,18 +532,12 @@ def start_attempt(
             start_time,
             status,
             candidate_name,
-<<<<<<< HEAD
             candidate_email,
             candidate_phone,
             candidate_department,
             candidate_division
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
-            candidate_email
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         """,
         (
             attempt_id,
@@ -572,12 +548,9 @@ def start_attempt(
             "IN_PROGRESS",
             candidate_name,
             candidate_email,
-<<<<<<< HEAD
             candidate_phone,
             candidate_department,
             candidate_division,
-=======
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         ),
     )
 
@@ -677,7 +650,6 @@ def start_public_attempt(
         or ""
     ).strip().lower()
 
-<<<<<<< HEAD
     candidate_phone = (
         candidate.get("phone") or candidate.get("mobile") or ""
     ).strip()
@@ -690,8 +662,6 @@ def start_public_attempt(
         candidate.get("division") or candidate.get("div") or ""
     ).strip()
 
-=======
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     if not candidate_name:
         raise ValueError(
             "Candidate name is required"
@@ -699,7 +669,6 @@ def start_public_attempt(
 
     if not candidate_email:
         raise ValueError(
-<<<<<<< HEAD
             "Candidate email is required"
         )
 
@@ -716,9 +685,6 @@ def start_public_attempt(
     if not candidate_division:
         raise ValueError(
             "Division / Section is required"
-=======
-            "Candidate email or student ID is required"
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         )
 
     # -----------------------------------------------------
@@ -838,18 +804,12 @@ def start_public_attempt(
             start_time,
             status,
             candidate_name,
-<<<<<<< HEAD
             candidate_email,
             candidate_phone,
             candidate_department,
             candidate_division
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
-            candidate_email
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         """,
         (
             attempt_id,
@@ -860,19 +820,11 @@ def start_public_attempt(
             "IN_PROGRESS",
             candidate_name,
             candidate_email,
-<<<<<<< HEAD
             candidate_phone,
             candidate_department,
             candidate_division,
         ),
     )
-
-
-=======
-        ),
-    )
-
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     db.commit()
 
     return attempt_id
@@ -935,11 +887,7 @@ def ensure_attempt_active(aid):
 
         elapsed = (
             datetime.now(timezone.utc)
-<<<<<<< HEAD
             - parse_iso(
-=======
-            - datetime.fromisoformat(
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
                 attempt["start_time"]
             )
         ).total_seconds()
@@ -1232,11 +1180,7 @@ def submit_attempt(
         timezone.utc
     )
 
-<<<<<<< HEAD
     start = parse_iso(
-=======
-    start = datetime.fromisoformat(
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         attempt["start_time"]
     )
 

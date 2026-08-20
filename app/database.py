@@ -167,14 +167,10 @@ CREATE TABLE IF NOT EXISTS attempts (
     status TEXT NOT NULL DEFAULT 'IN_PROGRESS',
     security_event_count INTEGER NOT NULL DEFAULT 0,
     candidate_name TEXT NOT NULL,
-<<<<<<< HEAD
     candidate_email TEXT NOT NULL,
     candidate_phone TEXT,
     candidate_department TEXT,
     candidate_division TEXT
-=======
-    candidate_email TEXT NOT NULL
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 );
 
 CREATE TABLE IF NOT EXISTS attempt_answers (
@@ -388,7 +384,14 @@ def migrate_database():
             """
         )
 
-<<<<<<< HEAD
+    if "start_email_link" not in invitation_columns:
+        db.execute(
+            """
+            ALTER TABLE exam_invitations
+            ADD COLUMN start_email_link TEXT
+            """
+        )
+
     db.commit()
 
     # ---------------------------------------------------------
@@ -403,20 +406,6 @@ def migrate_database():
         db.execute("ALTER TABLE attempts ADD COLUMN candidate_division TEXT")
 
     db.commit()
-
-
-=======
-    if "start_email_link" not in invitation_columns:
-        db.execute(
-            """
-            ALTER TABLE exam_invitations
-            ADD COLUMN start_email_link TEXT
-            """
-        )
-
-    db.commit()
-
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     # ---------------------------------------------------------
     # EXAM INDEXES
     # ---------------------------------------------------------

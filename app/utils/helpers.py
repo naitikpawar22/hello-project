@@ -1,8 +1,6 @@
 import hashlib, json, secrets, uuid
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-
-<<<<<<< HEAD
 import socket
 
 def get_lan_ip():
@@ -26,8 +24,6 @@ def get_shareable_url(req, relative_path=""):
     relative_path = relative_path.lstrip("/")
     return f"{scheme}://{host}/{relative_path}"
 
-=======
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 def now_utc():
     return datetime.now(timezone.utc)
 
@@ -36,14 +32,10 @@ def now_iso():
 
 def parse_iso(value):
     if not value: return None
-<<<<<<< HEAD
     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
-=======
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 
 def to_local_iso(value, tz_name="Asia/Kolkata"):
     dt = parse_iso(value) if isinstance(value, str) else value
@@ -60,7 +52,3 @@ def json_dumps(value): return json.dumps(value, separators=(",", ":"), ensure_as
 def json_loads(value, default):
     try: return json.loads(value)
     except Exception: return default
-<<<<<<< HEAD
-
-=======
->>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
