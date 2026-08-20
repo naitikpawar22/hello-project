@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<main class="auth-shell">
+  <div class="auth-container">
+    
+    <!-- Left Hero Banner -->
+    <section class="brand-card">
+      <div class="brand-header">
+        <div class="brand-mark">EF</div>
+        <span class="brand-title">ExamForge</span>
+      </div>
+      
+      <div class="hero-text">
+        <h1>Next-Gen Exam Management & Proctored Evaluation</h1>
+        <p>A comprehensive platform for creating examinations, managing question banks, student scheduling, live proctoring, and automated result generation.</p>
+      </div>
+
+      <div class="feature-pills">
+        <div class="pill">⚡ Automated Grading</div>
+        <div class="pill">🛡️ Anti-Cheat Proctoring</div>
+        <div class="pill">📚 Dynamic Question Banks</div>
+        <div class="pill">📄 Instant PDF Certificates</div>
+      </div>
+    </section>
+
+    <!-- Right Login / Access Card -->
+    <section class="auth-card">
+      
+      <!-- Tab Switcher -->
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" id="tabAdmin" onclick="switchTab('admin')">
+          🔑 Administrative Portal
+        </button>
+        <button type="button" class="auth-tab" id="tabStudent" onclick="switchTab('student')">
+          🎓 Student Access
+        </button>
+      </div>
+
+      <!-- Admin Login Form -->
+      <div id="adminPanel">
+        <div class="auth-card-header">
+          <h2>Administrator / Teacher</h2>
+          <p class="muted">Sign in with your admin credentials to access the management dashboard.</p>
+        </div>
+
+        <div id="loginAlert" class="alert-error" style="display: none;"></div>
+
+        <form id="loginForm" class="stack" style="gap: 18px;">
+          <label>Email Address
+            <input id="email" type="email" placeholder="admin@examforge.local" required autocomplete="email" />
+          </label>
+
+          <label>Password
+            <input id="password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+          </label>
+
+          <button class="btn btn-primary" type="submit" id="loginBtn" style="width: 100%; min-height: 48px; font-size: 16px; margin-top: 6px;">
+            Sign In to Dashboard →
+          </button>
+        </form>
+
+        <div class="setup-note" style="margin-top: 24px; padding: 14px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; font-size: 13px; color: var(--muted);">
+          <strong>Need administrator access?</strong><br />
+          Run <code>flask --app run.py create-admin</code> in your terminal or use environment configuration to generate default credentials.
+        </div>
+      </div>
+
+      <!-- Student Access Form -->
+      <div id="studentPanel" style="display: none;">
+        <div class="auth-card-header">
+          <h2>Student Examination Portal</h2>
+          <p class="muted">Enter your shareable Exam Code or Invitation Token to start your test.</p>
+        </div>
+
+        <form id="studentAccessForm" class="stack" style="gap: 18px;">
+          <label>Exam Code or Invitation Token
+            <input id="examCodeInput" type="text" placeholder="e.g. EXAM-ABC1234 or invitation token..." required style="text-transform: uppercase; font-family: monospace; font-size: 16px; letter-spacing: 1px;" />
+          </label>
+
+          <button class="btn btn-primary" type="submit" style="width: 100%; min-height: 48px; font-size: 16px; margin-top: 6px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
+            Open Examination →
+          </button>
+        </form>
+
+        <div style="margin-top: 24px; padding: 14px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0; font-size: 13px; color: #15803d;">
+          💡 <strong>Student Tip:</strong> If your teacher provided a direct exam link, you can also paste the URL in your browser address bar.
+        </div>
+      </div>
+
+    </section>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function switchTab(tab) {
+    if (tab === 'admin') {
+      tabAdmin.classList.add('active');
+      tabStudent.classList.remove('active');
+      adminPanel.style.display = 'block';
+      studentPanel.style.display = 'none';
+    } else {
+      tabStudent.classList.add('active');
+      tabAdmin.classList.remove('active');
+      studentPanel.style.display = 'block';
+      adminPanel.style.display = 'none';
+    }
+  }
+
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    loginBtn.disabled = true;
+    loginBtn.textContent = "Authenticating...";
+    loginAlert.style.display = "none";
+
+    try {
+      const r = await api("/api/auth/login", "POST", {
+        email: email.value.trim(),
+        password: password.value,
+      });
+      if (r.user) {
+        toast("Welcome back, " + (r.user.name || "Administrator"));
+        location = "/admin/dashboard";
+      }
+    } catch (err) {
+      loginAlert.textContent = err.message || "Invalid login credentials.";
+      loginAlert.style.display = "block";
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = "Sign In to Dashboard →";
+    }
+  });
+
+  document.getElementById("studentAccessForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const code = examCodeInput.value.trim();
+    if (!code) return;
+    
+    // If user inputs invitation token vs exam code
+    if (code.length > 20 && !code.includes('-')) {
+      location = "/student/exam/" + encodeURIComponent(code);
+    } else {
+      location = "/exam/" + encodeURIComponent(code);
+    }
+  });
+</script>
+{% endblock %}

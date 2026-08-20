@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+  <main class="content">
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">MANUAL AUTHORING</span>
+        <h1>Blank Exam Builder</h1>
+        <p class="muted">
+          Create questions manually with MCQ/MSQ options, then generate your shareable exam link.
+        </p>
+      </div>
+      <button class="primary" id="create">Create blank exam</button>
+    </header>
+
+    <section class="panel form-grid">
+      <label>Exam title<input id="title" value="New Blank Exam" required /></label>
+      <label>Duration (minutes)<input id="duration" type="number" min="1" value="60" required /></label>
+      <label>Pass %<input id="pass" type="number" min="0" max="100" value="40" required /></label>
+      <label>Description<textarea id="desc" placeholder="Optional exam instructions"></textarea></label>
+    </section>
+
+    <!-- Success Result Panel -->
+    <section id="createdExam" class="panel" hidden style="margin-bottom: 24px;">
+      <h2>Exam Created Successfully</h2>
+      <div class="result-grid">
+        <dt>Exam Title</dt>
+        <dd id="resTitle">-</dd>
+
+        <dt>Exam Code</dt>
+        <dd id="resCode">-</dd>
+
+        <dt>Shareable Link</dt>
+        <dd>
+          <div class="inline-form">
+            <input id="resLink" readonly />
+            <button type="button" class="btn btn-sm btn-secondary" id="copyLinkBtn">Copy Link</button>
+            <a id="openLinkBtn" class="btn btn-sm btn-primary" target="_blank" href="#">Open Exam</a>
+          </div>
+        </dd>
+      </div>
+    </section>
+
+    <section id="qs" class="stack"></section>
+    <div style="margin-top: 20px;">
+      <button class="ghost" id="add">+ Add question</button>
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let questionsData = [];
+
+  function card(q, i) {
+    return `
+      <article class="panel question-card">
+        <div class="question-head">
+          <span class="badge">Question ${i + 1}</span>
+          <button class="ghost danger" onclick="removeQ(${i})">Remove</button>
+        </div>
+        <label>
+          Question Text
+          <textarea data-field="text" placeholder="Enter question text">${escapeHtml(q.text || "")}</textarea>
+        </label>
+        <div class="four-grid">
+          ${[0, 1, 2, 3]
+            .map(
+              (j) =>
+                `<label>Option ${String.fromCharCode(65 + j)}<input data-opt="${j}" placeholder="Option ${String.fromCharCode(65 + j)}" value="${escapeHtml(q.options[j] || "")}"></label>`
+            )
+            .join("")}
+        </div>
+        <div class="four-grid">
+          <label>Type
+            <select data-field="type">
+              <option ${q.type === "MCQ" ? "selected" : ""}>MCQ</option>
+              <option ${q.type === "MSQ" ? "selected" : ""}>MSQ</option>
+            </select>
+          </label>
+          <label>Correct Answer(s)
+            <input data-field="correct" placeholder="e.g. A or 0 for MCQ, A,C or 0,2 for MSQ" value="${escapeHtml(q.correct || "")}">
+          </label>
+          <label>Marks
+            <input data-field="marks" type="number" step="0.5" min="0" value="${q.marks || 1}">
+          </label>
+          <label>Negative Marks
+            <input data-field="negative" type="number" step="0.5" min="0" value="${q.negative || 0}">
+          </label>
+        </div>
+        <div class="four-grid">
+          <label style="grid-column: span 2;">Topic
+            <input data-field="topic" placeholder="Topic name (optional)" value="${escapeHtml(q.topic || "")}">
+          </label>
+          <label style="grid-column: span 2;">Explanation
+            <textarea data-field="explanation" placeholder="Detailed answer explanation (optional)" style="min-height: 50px;">${escapeHtml(q.explanation || "")}</textarea>
+          </label>
+        </div>
+      </article>
+    `;
+  }
+
+  function render() {
+    qs.innerHTML = questionsData.map(card).join("");
+  }
+
+  function sync() {
+    questionsData = [...qs.children].map((a) => {
+      const opts = [...a.querySelectorAll("[data-opt]")].map((x) => x.value);
+      return {
+        text: a.querySelector("[data-field=text]").value,
+        options: opts,
+        type: a.querySelector("[data-field=type]").value,
+        correct: a.querySelector("[data-field=correct]").value,
+        marks: a.querySelector("[data-field=marks]").value,
+        negative: a.querySelector("[data-field=negative]").value,
+        topic: a.querySelector("[data-field=topic]").value,
+        explanation: a.querySelector("[data-field=explanation]").value,
+      };
+    });
+  }
+
+  function removeQ(i) {
+    sync();
+    questionsData.splice(i, 1);
+    render();
+  }
+
+  add.onclick = () => {
+    sync();
+    questionsData.push({ options: ["", "", "", ""], type: "MCQ", marks: 1, negative: 0 });
+    render();
+  };
+
+  create.onclick = async () => {
+    sync();
+
+    if (!title.value.trim()) {
+      toast("Exam title is required", "error");
+      return;
+    }
+
+    if (!questionsData.length) {
+      toast("Add at least one question", "error");
+      return;
+    }
+
+    create.disabled = true;
+    create.textContent = "Creating...";
+
+    try {
+      const r = await api("/api/exams/blank", "POST", {
+        title: title.value.trim(),
+        description: desc.value.trim(),
+        duration_minutes: +duration.value,
+        pass_percentage: +pass.value,
+        access_mode: "PUBLIC",
+        questions: questionsData,
+      });
+
+      if (r.id) {
+        toast("Exam created successfully!");
+        resTitle.textContent = r.title || title.value;
+        resCode.textContent = r.exam_code || "-";
+        const link = r.exam_link || `${window.location.origin}/exam/${r.exam_code}`;
+        resLink.value = link;
+        openLinkBtn.href = link;
+        createdExam.hidden = false;
+        createdExam.scrollIntoView({ behavior: "smooth" });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      create.disabled = false;
+      create.textContent = "Create blank exam";
+    }
+  };
+
+  copyLinkBtn.onclick = async () => {
+    if (!resLink.value) return;
+    try {
+      await navigator.clipboard.writeText(resLink.value);
+      toast("Exam link copied to clipboard!");
+    } catch {
+      resLink.select();
+      document.execCommand("copy");
+      toast("Exam link copied to clipboard!");
+    }
+  };
+
+  requireAuth().then(() => {
+    questionsData.push({ options: ["", "", "", ""], type: "MCQ", marks: 1, negative: 0 });
+    render();
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+
+  <main class="content">
+    <header class="page-header" style="align-items: flex-start; justify-content: space-between; gap: 20px;">
+      <div>
+        <span class="eyebrow">QUESTION REPOSITORY</span>
+        <h1>Question Banks</h1>
+        <p class="muted">Manage question banks, import files (PDF, DOCX, XLSX, CSV), and convert banks into live exams with one click.</p>
+      </div>
+
+      <!-- Quick Import Panel -->
+      <div class="panel" style="padding: 16px; min-width: 380px;">
+        <h3 style="font-size: 14px; margin-bottom: 10px; color: var(--cyan);">📥 Import Question Bank</h3>
+        <form id="importForm" class="stack" style="gap: 10px;">
+          <input name="name" placeholder="Bank Name (e.g. Physics Chapter 1)" required />
+          <input name="file" type="file" accept=".pdf,.xml,.html,.docx,.xlsx,.xlsm,.csv" required />
+          <button type="submit" class="btn btn-primary btn-sm" style="width: 100%;">
+            Upload & Parse Bank
+          </button>
+        </form>
+      </div>
+    </header>
+
+    <!-- Search & Filter Bar -->
+    <section class="panel" style="margin-bottom: 20px;">
+      <div class="inline-form" style="display: flex; gap: 12px; align-items: center;">
+        <input id="searchBankInput" placeholder="Search question bank by name..." style="flex: 1; max-width: 450px;" />
+        <span class="badge" style="background: rgba(99,102,241,0.2); color: #818cf8;" id="totalBanksBadge">0 Banks</span>
+      </div>
+    </section>
+
+    <!-- Question Banks Grid -->
+    <section id="banksGrid" class="card-grid"></section>
+
+    <!-- Create Exam from Bank Modal -->
+    <div id="createExamModal" class="modal-backdrop" hidden>
+      <div class="panel modal-content" style="max-width: 520px; margin: 60px auto;">
+        <h2 style="color: #0f172a;">⚡ Create Exam from Question Bank</h2>
+        <p class="muted" style="font-size: 14px; margin-bottom: 16px;">
+          All questions in <b id="modalBankName" style="color: var(--accent); font-weight: 800;"></b> will be compiled into a published examination.
+        </p>
+
+        <form id="createExamForm" class="stack" style="gap: 14px;">
+          <input type="hidden" id="modalBankId" />
+
+          <label>Exam Title
+            <input id="modalExamTitle" required />
+          </label>
+
+          <label>Duration (minutes)
+            <input id="modalExamDuration" type="number" min="1" value="60" required />
+          </label>
+
+          <label>Pass Percentage (%)
+            <input id="modalExamPass" type="number" min="0" max="100" value="40" required />
+          </label>
+
+          <label>Access Mode
+            <select id="modalExamAccess">
+              <option value="PUBLIC">Public - Shareable Link / Code</option>
+              <option value="PRIVATE">Private - Student Invitations Only</option>
+            </select>
+          </label>
+
+          <!-- Result link box inside modal -->
+          <div id="examCreatedSuccessBox" class="setup-note" hidden style="margin-top: 10px;">
+            <div style="font-weight: 700; color: var(--ok); margin-bottom: 6px;">🎉 Exam Published Successfully!</div>
+            <div class="inline-form">
+              <input id="createdExamLinkInput" readonly style="flex: 1; font-size: 13px;" />
+              <button type="button" class="btn btn-sm btn-secondary" id="modalCopyBtn">Copy Link</button>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
+            <button type="button" class="btn btn-secondary" id="closeCreateExamBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="publishExamBtn">⚡ Publish Exam</button>
+            <a href="/admin/exams" id="goToExamsBtn" class="btn btn-primary" hidden>Go to Exam Management</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Bank Modal -->
+    <div id="editBankModal" class="modal-backdrop" hidden>
+      <div class="panel modal-content" style="max-width: 480px; margin: 60px auto;">
+        <h2 style="color: #0f172a;">Edit Question Bank</h2>
+        <form id="editBankForm" class="stack" style="gap: 14px; margin-top: 16px;">
+          <input type="hidden" id="editBankId" />
+
+          <label>Bank Name
+            <input id="editBankName" required />
+          </label>
+
+          <label>Description
+            <textarea id="editBankDesc" placeholder="Optional description"></textarea>
+          </label>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+            <button type="button" class="btn btn-secondary" id="closeEditBankBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let rawBanks = [];
+
+  requireAuth().then(loadBanks);
+
+  async function loadBanks() {
+    try {
+      const d = await api("/api/question-banks");
+      rawBanks = d.question_banks || [];
+      totalBanksBadge.textContent = `${rawBanks.length} Question Banks`;
+      renderBanks();
+    } catch (err) {
+      console.error(err);
+      banksGrid.innerHTML = empty("Failed to load question banks.");
+    }
+  }
+
+  function renderBanks() {
+    const q = searchBankInput.value.trim().toLowerCase();
+    const filtered = rawBanks.filter(b => (b.name || "").toLowerCase().includes(q));
+
+    if (!filtered.length) {
+      banksGrid.innerHTML = empty("No question banks match your search.");
+      return;
+    }
+
+    banksGrid.innerHTML = filtered.map(b => {
+      const formatUpper = (b.source_format || "manual").toUpperCase();
+
+      return `
+        <article class="panel question-bank-card" style="display: flex; flex-direction: column; justify-content: space-between; border-left: 4px solid var(--cyan);">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span class="badge" style="background: rgba(6,182,212,0.15); color: var(--cyan); font-weight: 700;">${formatUpper}</span>
+              <span class="badge" style="background: rgba(99,102,241,0.2); color: #818cf8;">${b.question_count || 0} Questions</span>
+            </div>
+
+            <h3 style="font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">
+              📁 ${escapeHtml(b.name)}
+            </h3>
+
+            <p class="muted" style="font-size: 13px; line-height: 1.4; margin-bottom: 16px;">
+              ${escapeHtml(b.description || "No description provided.")}
+            </p>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
+            <!-- Primary Action: Add / Create Exam from Bank -->
+            <button type="button" class="btn btn-primary" style="width: 100%; text-align: center; justify-content: center;" onclick="openCreateExamModal('${b.id}')">
+              ⚡ Add to Exam / Create Exam
+            </button>
+
+            <div class="action-group" style="display: flex; justify-content: space-between; gap: 6px;">
+              <button type="button" class="btn btn-sm btn-secondary" style="flex: 1;" onclick="openBankDetail('${b.id}')">
+                👁️ Questions
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary" title="Edit Bank Name" onclick="openEditBankModal('${b.id}')">
+                ✏️ Edit
+              </button>
+              <button type="button" class="btn btn-sm btn-danger" title="Delete Bank" onclick="confirmDeleteBank('${b.id}', '${escapeHtml(b.name)}')">
+                🗑️ Delete
+              </button>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join("");
+  }
+
+  searchBankInput.oninput = renderBanks;
+
+  /* Navigate to Questions Detail */
+  function openBankDetail(id) {
+    location.href = "/admin/question-bank-detail?bank=" + encodeURIComponent(id);
+  }
+
+  /* Open Create Exam from Bank Modal */
+  function openCreateExamModal(bid) {
+    const b = rawBanks.find(x => x.id === bid);
+    if (!b) return;
+
+    modalBankId.value = b.id;
+    modalBankName.textContent = b.name;
+    modalExamTitle.value = `${b.name} Assessment`;
+    modalExamDuration.value = 60;
+    modalExamPass.value = 40;
+    modalExamAccess.value = "PUBLIC";
+
+    examCreatedSuccessBox.hidden = true;
+    publishExamBtn.hidden = false;
+    goToExamsBtn.hidden = true;
+    createExamModal.hidden = false;
+  }
+
+  closeCreateExamBtn.onclick = () => { createExamModal.hidden = true; };
+
+  createExamForm.onsubmit = async (evt) => {
+    evt.preventDefault();
+    const bid = modalBankId.value;
+    publishExamBtn.disabled = true;
+    publishExamBtn.textContent = "Publishing...";
+
+    try {
+      const r = await api(`/api/question-banks/${bid}/create-exam`, "POST", {
+        title: modalExamTitle.value.trim(),
+        duration_minutes: parseInt(modalExamDuration.value, 10),
+        pass_percentage: parseInt(modalExamPass.value, 10),
+        access_mode: modalExamAccess.value,
+      });
+
+      if (r.id) {
+        toast("Exam created & published successfully!");
+        createdExamLinkInput.value = r.exam_link || `${window.location.origin}/exam/${r.exam_code}`;
+        examCreatedSuccessBox.hidden = false;
+        publishExamBtn.hidden = true;
+        goToExamsBtn.hidden = false;
+      }
+    } catch (err) {
+      console.error(err);
+      toast("Failed to create exam: " + (err.message || err), "error");
+    } finally {
+      publishExamBtn.disabled = false;
+      publishExamBtn.textContent = "⚡ Publish Exam";
+    }
+  };
+
+  modalCopyBtn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(createdExamLinkInput.value);
+      toast("Exam link copied to clipboard!");
+    } catch {
+      createdExamLinkInput.select();
+      document.execCommand("copy");
+      toast("Exam link copied to clipboard!");
+    }
+  };
+
+  /* Open Edit Bank Modal */
+  function openEditBankModal(bid) {
+    const b = rawBanks.find(x => x.id === bid);
+    if (!b) return;
+    editBankId.value = b.id;
+    editBankName.value = b.name || "";
+    editBankDesc.value = b.description || "";
+    editBankModal.hidden = false;
+  }
+
+  closeEditBankBtn.onclick = () => { editBankModal.hidden = true; };
+
+  editBankForm.onsubmit = async (evt) => {
+    evt.preventDefault();
+    const bid = editBankId.value;
+    try {
+      await api(`/api/question-banks/${bid}`, "PUT", {
+        name: editBankName.value.trim(),
+        description: editBankDesc.value.trim(),
+      });
+      toast("Question bank updated successfully!");
+      editBankModal.hidden = true;
+      loadBanks();
+    } catch (err) {
+      console.error(err);
+      toast("Failed to update question bank", "error");
+    }
+  };
+
+  /* Confirm Delete Bank */
+  async function confirmDeleteBank(bid, name) {
+    if (!confirm(`Are you sure you want to delete question bank "${name}"?\n\nAll questions in this bank will be deleted.`)) return;
+    try {
+      const res = await api(`/api/question-banks/${bid}`, "DELETE");
+      toast(res.message || "Question bank deleted.");
+      loadBanks();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  /* File Import Handler */
+  importForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const submitBtn = importForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Importing...";
+
+    try {
+      const fd = new FormData(importForm);
+      const res = await apiForm("/api/question-banks/import", fd);
+      toast(`Successfully imported ${res.imported || 0} questions!`);
+      importForm.reset();
+      loadBanks();
+    } catch (err) {
+      console.error(err);
+      toast("Import failed: " + (err.message || err), "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Upload & Parse Bank";
+    }
+  };
+</script>
+
+<style>
+  .modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+  }
+</style>
+{% endblock %}

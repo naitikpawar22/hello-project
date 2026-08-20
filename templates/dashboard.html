@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+
+  <main class="content">
+    
+    <!-- Page Header -->
+    <header class="page-header" style="margin-bottom: 24px;">
+      <div>
+        <span class="eyebrow">ADMINISTRATION PLATFORM</span>
+        <h1 style="display: flex; align-items: center; gap: 10px;">
+          Operations Dashboard
+          <span class="badge ok" style="font-size: 12px; font-weight: 700; padding: 4px 10px;">LIVE</span>
+        </h1>
+        <p class="muted" style="margin-top: 4px;">Real-time overview of candidate examinations, question banks, and evaluation outcomes.</p>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="/admin/blank-exam-builder" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>⚡</span> New Quick Exam
+        </a>
+        <a href="/admin/exam-builder" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>📚</span> Build From Bank
+        </a>
+        <a href="/admin/results" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>📈</span> All Results
+        </a>
+      </div>
+    </header>
+
+    <!-- Top Key Metrics Cards -->
+    <section id="stats" class="stat-grid"></section>
+
+    <!-- Two-column Analytics & Operations Panel -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;" class="dashboard-grid">
+      
+      <!-- Recent Exam Attempts Panel -->
+      <section class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+          <h2 style="font-size: 18px; font-weight: 800; margin: 0; color: #0f172a;">Recent Candidate Attempts</h2>
+          <a href="/admin/results" class="btn btn-sm btn-ghost" style="font-weight: 700;">View All →</a>
+        </div>
+        <div id="recentAttempts">
+          <div class="empty">Loading attempt records...</div>
+        </div>
+      </section>
+
+      <!-- Recent & Upcoming Examinations Panel -->
+      <section class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+          <h2 style="font-size: 18px; font-weight: 800; margin: 0; color: #0f172a;">Published & Active Exams</h2>
+          <a href="/admin/exams" class="btn btn-sm btn-ghost" style="font-weight: 700;">Manage Exams →</a>
+        </div>
+        <div id="recentExams">
+          <div class="empty">Loading examination data...</div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  requireAuth().then(loadDashboard);
+
+  async function loadDashboard() {
+    try {
+      const d = await api("/api/dashboard");
+      const s = d.stats || {};
+
+      // Render custom styled Stat Cards
+      stats.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">👥 Total Students</div>
+          <div class="stat-value">${Number(s.total_students || 0).toLocaleString()}</div>
+          <small class="muted">${Number(s.active_students || 0)} active registered</small>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">📚 Question Banks</div>
+          <div class="stat-value">${Number(s.question_banks || 0).toLocaleString()}</div>
+          <small class="muted">${Number(s.questions || 0).toLocaleString()} total questions</small>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">📝 Total Exams</div>
+          <div class="stat-value">${Number(s.exams || 0).toLocaleString()}</div>
+          <small class="muted">${Number(s.published_exams || 0)} published / live</small>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">🎯 Attempts Taken</div>
+          <div class="stat-value">${Number(s.attempts || 0).toLocaleString()}</div>
+          <small class="muted">Candidate submissions</small>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">📊 Average Score</div>
+          <div class="stat-value" style="color: var(--cyan);">${Number(s.average_percentage || 0).toFixed(1)}%</div>
+          <small class="muted">Across all evaluations</small>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">🏆 Pass Rate</div>
+          <div class="stat-value" style="color: var(--ok);">${Number(s.pass_rate || 0).toFixed(1)}%</div>
+          <small class="muted">Successful candidates</small>
+        </div>
+      `;
+
+      // Render Recent Attempts with high quality table
+      const recentList = d.recent_attempts || [];
+      if (!recentList.length) {
+        recentAttempts.innerHTML = empty("No exam attempts recorded yet.");
+      } else {
+        recentAttempts.innerHTML = `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Exam Title</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${recentList.map(r => `
+                  <tr>
+                    <td style="font-weight: 700; color: #0f172a;">${escapeHtml(r.candidate_name)}</td>
+                    <td style="font-size: 13px; font-weight: 600;">${escapeHtml(r.title)}</td>
+                    <td style="font-weight: 800; color: var(--cyan);">${Number(r.percentage).toFixed(1)}%</td>
+                    <td><span class="badge ${r.passed ? 'ok' : 'danger'}">${r.passed ? 'PASS' : 'FAIL'}</span></td>
+                    <td>
+                      <a href="/admin/results/${r.id}" class="btn btn-sm btn-secondary" target="_blank">View</a>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      // Render Recent/Upcoming Exams with links
+      const examList = d.recent_exams || [];
+      if (!examList.length) {
+        recentExams.innerHTML = empty("No exams created yet.");
+      } else {
+        recentExams.innerHTML = `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${examList.map(e => `
+                  <tr>
+                    <td style="font-weight: 700; color: #0f172a;">${escapeHtml(e.title)}</td>
+                    <td><span class="badge ${e.status === 'PUBLISHED' || e.status === 'LIVE' ? 'ok' : 'warn'}">${escapeHtml(e.status || 'DRAFT')}</span></td>
+                    <td style="font-size: 12px; color: var(--muted);">${new Date(e.created_at || Date.now()).toLocaleDateString()}</td>
+                    <td>
+                      <a href="/admin/exams" class="btn btn-sm btn-secondary">Manage</a>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+    } catch (err) {
+      console.error(err);
+      toast("Failed to load dashboard data", "error");
+    }
+  }
+</script>
+
+<style>
+@media (max-width: 992px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+</style>
+{% endblock %}

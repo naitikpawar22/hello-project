@@ -1,0 +1,315 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<main class="result-shell" style="max-width: 900px; margin: 30px auto; padding: 20px;">
+  <div id="resultCard">
+    <div class="panel" style="text-align: center; padding: 40px;">
+      <div class="empty">Loading submission details...</div>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const resultId = {{ result_id|tojson }};
+  const isAdminView = window.location.pathname.startsWith('/admin');
+
+  async function loadResult() {
+    try {
+      const d = await api('/api/results/public/' + resultId + '/details');
+      const r = d.result;
+
+      if (!r) {
+        resultCard.innerHTML = `
+          <div class="panel" style="text-align: center; padding: 40px;">
+            <div style="font-size: 48px; margin-bottom: 12px;">⚠️</div>
+            <h2>Submission Record Not Found</h2>
+            <p class="muted">We could not locate this exam submission record.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Check if user is logged in as Admin/Teacher or accessing /admin path
+      let userIsAdmin = isAdminView;
+      if (!userIsAdmin) {
+        try {
+          const auth = await api('/api/auth/me');
+          if (auth && auth.user && (auth.user.role === 'admin' || auth.user.role === 'teacher')) {
+            userIsAdmin = true;
+          }
+        } catch (e) {
+          userIsAdmin = false;
+        }
+      }
+
+      if (userIsAdmin) {
+        renderAdminDetailedView(r);
+      } else {
+        renderStudentConfirmationView(r);
+      }
+
+    } catch (err) {
+      console.error(err);
+      resultCard.innerHTML = `
+        <div class="panel" style="text-align: center; padding: 40px;">
+          <div style="font-size: 48px; color: var(--ok); margin-bottom: 12px;">✓</div>
+          <h2>Thank You For Attempting The Exam!</h2>
+          <p class="muted">Your responses have been recorded successfully.</p>
+        </div>
+      `;
+    }
+  }
+
+  /* =========================================================
+     STUDENT CONFIRMATION VIEW (No scores or correct answers)
+     ========================================================= */
+  function renderStudentConfirmationView(r) {
+    const details = r.details || [];
+    const totalQuestions = details.length || ((r.correct_count || 0) + (r.wrong_count || 0) + (r.skipped_count || 0));
+    const attemptedCount = (r.correct_count || 0) + (r.wrong_count || 0);
+    const submittedDate = new Date(r.created_at || Date.now()).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    resultCard.innerHTML = `
+      <div class="panel" style="background: #ffffff; border: 1px solid var(--border); border-radius: 20px; padding: 44px 36px; text-align: center; box-shadow: var(--shadow-md);">
+        
+        <!-- Success Checkmark Icon -->
+        <div style="width: 84px; height: 84px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; box-shadow: 0 8px 24px rgba(22, 163, 74, 0.25);">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+
+        <span class="badge ok" style="font-size: 13px; font-weight: 800; padding: 6px 18px; margin-bottom: 14px; letter-spacing: 0.5px;">EXAM SUBMITTED SUCCESSFULLY</span>
+
+        <h1 style="font-size: 30px; font-weight: 800; color: #0f172a; margin: 6px 0 12px 0; letter-spacing: -0.5px;">
+          Thank You For Attempting The Exam!
+        </h1>
+
+        <p style="color: #475569; font-size: 16px; max-width: 540px; margin: 0 auto 32px auto; line-height: 1.6;">
+          Your answers have been securely recorded and submitted to the evaluation committee.
+        </p>
+
+        <!-- Official Submission Receipt Card -->
+        <div style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; text-align: left; margin-bottom: 32px;">
+          <div style="font-weight: 800; font-size: 12px; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 18px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span>OFFICIAL EXAMINATION RECEIPT</span>
+            <span class="badge ok" style="font-size: 11px;">Secured & Verified</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; font-size: 14px;">
+            <div>
+              <small class="muted" style="display: block; font-weight: 600; margin-bottom: 3px;">Candidate Name</small>
+              <strong style="color: #0f172a; font-size: 15px;">${escapeHtml(r.candidate_name)}</strong>
+            </div>
+
+            <div>
+              <small class="muted" style="display: block; font-weight: 600; margin-bottom: 3px;">Email / Student ID</small>
+              <strong style="color: #0f172a; font-size: 15px;">${escapeHtml(r.candidate_email)}</strong>
+            </div>
+
+            <div style="grid-column: span 2;">
+              <small class="muted" style="display: block; font-weight: 600; margin-bottom: 3px;">Examination Title</small>
+              <strong style="color: #0f172a; font-size: 15px;">${escapeHtml(r.exam_title)}</strong>
+            </div>
+
+            <div>
+              <small class="muted" style="display: block; font-weight: 600; margin-bottom: 3px;">Questions Answered</small>
+              <strong style="color: #0f172a; font-size: 15px;">${attemptedCount} of ${totalQuestions} Answered</strong>
+            </div>
+
+            <div>
+              <small class="muted" style="display: block; font-weight: 600; margin-bottom: 3px;">Time Taken</small>
+              <strong style="color: #0f172a; font-size: 15px;">${Math.floor((r.time_taken_seconds || 0) / 60)}m ${(r.time_taken_seconds || 0) % 60}s</strong>
+            </div>
+
+            <div>
+              <small class="muted" style="display: block; font-weight: 600; margin-bottom: 3px;">Submitted On</small>
+              <strong style="color: #0f172a; font-size: 15px;">${submittedDate}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; justify-content: center; margin-top: 10px;">
+          <button type="button" class="btn btn-danger" onclick="closeExamWindow()" style="min-height: 50px; padding: 0 36px; font-size: 16px; font-weight: 800; border-radius: 12px; width: 100%; max-width: 320px; box-shadow: 0 4px 14px rgba(225, 29, 72, 0.25);">
+            ✕ Close Window
+          </button>
+        </div>
+
+      </div>
+    `;
+  }
+
+  function closeExamWindow() {
+    try {
+      window.close();
+    } catch (e) {}
+    setTimeout(() => {
+      document.body.innerHTML = `
+        <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f172a; color: #ffffff; text-align: center; padding: 24px; font-family: system-ui, -apple-system, sans-serif;">
+          <div style="width: 80px; height: 80px; background: rgba(16, 185, 129, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border: 2px solid #10b981;">
+            <span style="font-size: 40px; color: #10b981;">✓</span>
+          </div>
+          <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 12px 0; color: #ffffff;">Examination Completed</h1>
+          <p style="color: #94a3b8; font-size: 16px; max-width: 440px; margin: 0; line-height: 1.6;">Your answers have been recorded securely. You may now safely close this browser window or tab.</p>
+        </div>
+      `;
+    }, 200);
+  }
+
+
+  /* =========================================================
+     ADMINISTRATOR DETAILED VIEW (Scores, Marks & Breakdown)
+     ========================================================= */
+  function renderAdminDetailedView(r) {
+    const passed = !!r.passed;
+    const passBadge = passed
+      ? `<span class="badge ok" style="font-size: 14px; padding: 6px 18px; font-weight: 800;">PASSED</span>`
+      : `<span class="badge danger" style="font-size: 14px; padding: 6px 18px; font-weight: 800;">FAILED</span>`;
+
+    const statusIcon = passed
+      ? `<div style="width: 72px; height: 72px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; box-shadow: 0 6px 20px rgba(22, 163, 74, 0.25);">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+         </div>`
+      : `<div style="width: 72px; height: 72px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; box-shadow: 0 6px 20px rgba(220, 38, 38, 0.25);">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+         </div>`;
+
+    const details = r.details || [];
+    const questionsTableHtml = details.length ? `
+      <div style="margin-top: 32px; text-align: left;">
+        <h3 style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 16px;">Detailed Question Analysis (Admin View)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>Question</th>
+                <th style="width: 80px;">Type</th>
+                <th>Candidate Response</th>
+                <th>Correct Answer</th>
+                <th style="width: 80px;">Marks</th>
+                <th style="width: 100px;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${details.map((q, i) => {
+                let statusBadge = '<span class="badge warn">Skipped</span>';
+                if (q.status === 'CORRECT') {
+                  statusBadge = '<span class="badge ok">Correct</span>';
+                } else if (q.status === 'WRONG') {
+                  statusBadge = '<span class="badge danger">Wrong</span>';
+                }
+
+                const studentAns = (q.selected_text && q.selected_text.length)
+                  ? q.selected_text.map(t => escapeHtml(t)).join(", ")
+                  : '<em class="muted">No response</em>';
+
+                const correctAns = (q.correct_text && q.correct_text.length)
+                  ? q.correct_text.map(t => escapeHtml(t)).join(", ")
+                  : '-';
+
+                return `
+                  <tr>
+                    <td style="font-weight: 700; color: var(--muted);">${i + 1}</td>
+                    <td style="font-weight: 600; color: #0f172a; max-width: 300px;">${escapeHtml(q.text || 'Question')}</td>
+                    <td><span class="badge" style="font-size: 11px;">${escapeHtml(q.type || 'MCQ')}</span></td>
+                    <td style="font-size: 13px;">${studentAns}</td>
+                    <td style="font-size: 13px; color: var(--ok); font-weight: 600;">${correctAns}</td>
+                    <td style="font-weight: 700; color: var(--accent);">${Number(q.earned_marks || 0).toFixed(2)}</td>
+                    <td>${statusBadge}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ` : '';
+
+    resultCard.innerHTML = `
+      <div class="panel" style="background: #ffffff; border: 1px solid var(--border); border-radius: 20px; padding: 36px 32px; box-shadow: var(--shadow-md);">
+        
+        <!-- Top Header -->
+        <div style="text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 24px;">
+          ${statusIcon}
+          <div style="margin-bottom: 8px;">${passBadge}</div>
+          <h1 style="font-size: 26px; font-weight: 800; color: #0f172a; margin: 8px 0 4px 0;">
+            ${escapeHtml(r.exam_title)}
+          </h1>
+          <p class="muted" style="margin: 0;">
+            Candidate: <strong>${escapeHtml(r.candidate_name)}</strong> (${escapeHtml(r.candidate_email)})
+          </p>
+        </div>
+
+        <!-- High Impact Score Hero Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px;">
+          <div style="background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); color: #fff; padding: 20px; border-radius: 16px; text-align: center; box-shadow: 0 4px 16px rgba(79,70,229,0.25);">
+            <small style="opacity: 0.85; text-transform: uppercase; font-size: 11px; font-weight: 800; letter-spacing: 0.8px;">Total Score</small>
+            <div style="font-size: 32px; font-weight: 900; font-family: 'Outfit', sans-serif; margin-top: 4px;">
+              ${Number(r.score).toFixed(2)} <span style="font-size: 16px; opacity: 0.7;">/ ${Number(r.max_marks).toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 16px; text-align: center;">
+            <small class="muted" style="text-transform: uppercase; font-size: 11px; font-weight: 800; letter-spacing: 0.8px;">Percentage</small>
+            <div style="font-size: 32px; font-weight: 900; font-family: 'Outfit', sans-serif; color: #0f172a; margin-top: 4px;">
+              ${Number(r.percentage).toFixed(2)}%
+            </div>
+            <small class="muted">Required: ${r.pass_percentage || 0}%</small>
+          </div>
+
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px; border-radius: 16px; text-align: center;">
+            <small style="color: #15803d; text-transform: uppercase; font-size: 11px; font-weight: 800; letter-spacing: 0.8px;">Correct Answers</small>
+            <div style="font-size: 32px; font-weight: 900; font-family: 'Outfit', sans-serif; color: #16a34a; margin-top: 4px;">
+              ${r.correct_count || 0}
+            </div>
+          </div>
+
+          <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 20px; border-radius: 16px; text-align: center;">
+            <small style="color: #b91c1c; text-transform: uppercase; font-size: 11px; font-weight: 800; letter-spacing: 0.8px;">Wrong / Skipped</small>
+            <div style="font-size: 32px; font-weight: 900; font-family: 'Outfit', sans-serif; color: #dc2626; margin-top: 4px;">
+              ${r.wrong_count || 0} <span style="font-size: 16px; color: var(--muted);">(${r.skipped_count || 0} skipped)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metadata info row -->
+        <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 14px; background: #f8fafc; padding: 14px 20px; border-radius: 12px; border: 1px solid #e2e8f0; font-size: 14px; margin-bottom: 24px;">
+          <div>⏱️ <strong>Time Spent:</strong> ${Math.floor((r.time_taken_seconds || 0) / 60)}m ${(r.time_taken_seconds || 0) % 60}s</div>
+          <div>🛡️ <strong>Security Events:</strong> ${r.security_event_count || 0} recorded</div>
+          <div>📅 <strong>Date:</strong> ${new Date(r.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+        </div>
+
+        <!-- Question Table -->
+        ${questionsTableHtml}
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border);">
+          <a href="/api/results/public/${r.id}/pdf" class="btn btn-primary" target="_blank" style="min-height: 44px; padding: 0 24px; font-size: 15px;">
+            📄 Download PDF Result
+          </a>
+          <button type="button" class="btn btn-secondary" onclick="window.print()" style="min-height: 44px; padding: 0 20px; font-size: 15px;">
+            🖨️ Print Result
+          </button>
+          <a href="/admin/dashboard" class="btn btn-secondary" style="min-height: 44px; padding: 0 20px; font-size: 15px;">
+            🏠 Back to Dashboard
+          </a>
+        </div>
+
+      </div>
+    `;
+  }
+
+  loadResult();
+</script>
+{% endblock %}

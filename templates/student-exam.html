@@ -1,0 +1,684 @@
+{% extends 'base.html' %}
+
+{% block body %}
+
+<main class="exam-shell">
+
+
+
+  <!-- Floating Local Proctoring Webcam Preview (Client-side Only) -->
+
+
+
+  <div id="webcamBox" class="webcam-box" hidden>
+    <div class="webcam-header">
+      <span class="webcam-dot"></span>
+      <span style="font-size: 11px; font-weight: 700; color: #10b981; letter-spacing: 0.5px;">LIVE PROCTORING</span>
+    </div>
+    <video id="webcamPreview" autoplay playsinline muted></video>
+  </div>
+
+  <!-- ======================================================
+       Exam Header
+       ====================================================== -->
+
+
+  <header class="exam-top">
+    <div>
+      <div class="brand">
+        <span class="brand-mark small">EF</span>
+        <span>ExamForge</span>
+      </div>
+      <h1 id="examTitle">Loading exam…</h1>
+    </div>
+
+    <div class="timer" id="timer">--:--</div>
+  </header>
+
+
+  <!-- ======================================================
+       Start / Candidate Confirmation
+       ====================================================== -->
+
+  <section id="startView" class="panel narrow">
+    <h2 id="startHeading">Before you begin</h2>
+    <div id="summary"></div>
+
+    <div id="accessInfo" class="setup-note" hidden></div>
+
+    <form id="startForm" class="stack" style="gap: 14px; margin-top: 20px;">
+      <label>Full Name
+        <input id="candidateName" type="text" autocomplete="name" placeholder="e.g. Rahul Sharma" required />
+      </label>
+
+      <label>Email Address
+        <input id="candidateEmail" type="email" autocomplete="email" placeholder="e.g. rahul@example.com" required />
+      </label>
+
+      <div class="two-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <label>Mobile Number
+          <input id="candidatePhone" type="tel" placeholder="e.g. 9876543210" required />
+        </label>
+        <label>Department
+          <input id="candidateDept" type="text" placeholder="e.g. Computer Science / BCA" required />
+        </label>
+      </div>
+
+      <label>Division / Section
+        <input id="candidateDiv" type="text" placeholder="e.g. Div A / Section 1" required />
+      </label>
+
+      <button type="submit" class="btn btn-primary" id="startExamBtn" style="min-height: 48px; font-size: 16px; width: 100%; margin-top: 6px;">
+        Start Exam →
+      </button>
+    </form>
+
+  </section>
+
+
+  <!-- ======================================================
+       Professional One-by-One Exam View
+       ====================================================== -->
+
+  <section id="examView" hidden class="stack" style="gap: 20px;">
+
+    <!-- Compact Question Palette Ribbon -->
+    <div class="panel nav-panel">
+      <div class="nav-header">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <span style="font-weight: 800; color: var(--heading); font-size: 15px;">Question Palette</span>
+          <span class="badge ok" id="answeredBadge">0 Answered</span>
+          <span class="badge" id="unansweredBadge">0 Remaining</span>
+        </div>
+
+        <button type="button" class="btn btn-sm btn-secondary" id="togglePaletteBtn">
+          ▲ Collapse Palette
+        </button>
+      </div>
+
+      <div id="navContainer">
+        <div id="nav"></div>
+      </div>
+    </div>
+
+
+    <!-- Single Question Card -->
+    <article class="panel question-panel">
+
+      <div class="progress">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span id="progress" style="font-size: 16px; font-weight: 800; color: var(--accent);">Question 1 of 10</span>
+          <span id="qTypeBadge" class="badge" style="background: rgba(79,70,229,0.1); color: var(--accent);">MCQ</span>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-sm btn-ghost" id="clearAnswerBtn" title="Clear response for this question">
+            Clear Response
+          </button>
+          <button type="button" class="btn btn-sm btn-secondary" id="fullscreen">
+            Fullscreen
+          </button>
+        </div>
+      </div>
+
+
+      <h2 id="qText" style="font-size: 18px; font-weight: 700; line-height: 1.6; margin: 20px 0; color: #0f172a;"></h2>
+
+
+      <div id="options" class="stack" style="gap: 12px; margin-bottom: 24px;"></div>
+
+
+      <div class="question-actions" style="display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid var(--border);">
+        <button type="button" class="btn btn-secondary" id="prev">
+          ← Previous
+        </button>
+
+        <button type="button" class="btn btn-primary" id="next">
+          Next Question →
+        </button>
+      </div>
+
+    </article>
+
+
+    <!-- Submit Exam Bar -->
+    <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+      <button type="button" class="btn btn-danger" id="submitBtn" style="min-width: 180px; min-height: 46px; font-size: 15px;">
+        Submit Examination
+      </button>
+    </div>
+
+  </section>
+
+</main>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+// Strict Global DevTools & Right-Click Prevention (Capturing Phase)
+["contextmenu", "copy", "paste", "cut", "dragstart", "selectstart"].forEach(evt => {
+    window.addEventListener(evt, (e) => {
+        if (!attemptId || examView.hidden || window.examSubmitting) return;
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }, true);
+});
+
+window.addEventListener("keydown", (e) => {
+    if (!attemptId || examView.hidden || window.examSubmitting) return;
+    const k = e.key.toLowerCase();
+    const isInspectShortcut = 
+        e.key === "F12" || 
+        (e.ctrlKey && e.shiftKey && ["i", "j", "c", "k", "e", "m"].includes(k)) ||
+        ((e.ctrlKey || e.metaKey) && ["u", "s", "p", "c", "v", "x", "a"].includes(k));
+
+    if (isInspectShortcut) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCheatViolation(`Blocked DevTools / Inspect Shortcut (${e.key})`, "shortcut_blocked");
+        return false;
+    }
+}, true);
+
+const invitationToken = {{ token|default(None)|tojson }};
+const publicExamCode = {{ exam_code|default(None)|tojson }};
+
+let examData = null;
+let attemptId = null;
+let index = 0;
+let answers = {};
+let endAtMs = 0;
+let timerInterval = null;
+let securityInitialized = false;
+
+const accessMode = invitationToken ? "PRIVATE" : (publicExamCode ? "PUBLIC" : null);
+
+
+async function load() {
+    try {
+        let endpoint = null;
+        if (accessMode === "PRIVATE") {
+            endpoint = "/api/student/exams/" + encodeURIComponent(invitationToken);
+        } else if (accessMode === "PUBLIC") {
+            endpoint = "/api/student/public-exams/" + encodeURIComponent(publicExamCode);
+        } else {
+            throw new Error("No valid exam access token or code provided.");
+        }
+
+        const data = await api(endpoint);
+        examData = data;
+        examTitle.textContent = data.exam.title;
+        renderStartInformation();
+
+        if (accessMode === "PRIVATE" && data.invitation && data.invitation.email) {
+            candidateEmail.value = data.invitation.email;
+        }
+    } catch (error) {
+        console.error("Exam loading failed:", error);
+        startView.innerHTML = `
+            <div class="empty">
+                Unable to load this examination.
+                <br><br>
+                ${escapeHtml(error.message || "The exam link is invalid or unavailable.")}
+            </div>
+        `;
+    }
+}
+
+function renderStartInformation() {
+    const exam = examData.exam;
+    const questions = examData.questions || [];
+    examTitle.textContent = exam.title;
+
+    summary.innerHTML = `
+        <p>${escapeHtml(exam.description || "No special instructions provided.")}</p>
+        <div class="four-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; background: #f8fafc; padding: 14px; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <div><small class="muted">Duration</small><br><strong>${escapeHtml(exam.duration_minutes)} min</strong></div>
+            <div><small class="muted">Total Questions</small><br><strong>${questions.length}</strong></div>
+            <div><small class="muted">Pass Mark</small><br><strong>${escapeHtml(exam.pass_percentage)}%</strong></div>
+        </div>
+    `;
+
+    if (accessMode === "PRIVATE") {
+        startHeading.textContent = "Private Assessment Confirmation";
+        accessInfo.hidden = false;
+        accessInfo.textContent = "You are accessing a private exam via unique candidate invitation.";
+    } else if (accessMode === "PUBLIC") {
+        startHeading.textContent = "Candidate Confirmation";
+        accessInfo.hidden = false;
+        accessInfo.textContent = "This is a shareable examination. Please confirm your details to begin.";
+    }
+}
+
+async function start(event) {
+    event.preventDefault();
+    if (!examData) return;
+
+    const name = candidateName.value.trim();
+    const email = candidateEmail.value.trim();
+    const phone = candidatePhone.value.trim();
+    const department = candidateDept.value.trim();
+    const division = candidateDiv.value.trim();
+
+    if (!name) { toast("Full name is required", "error"); candidateName.focus(); return; }
+    if (!email) { toast("Email address is required", "error"); candidateEmail.focus(); return; }
+    if (!phone) { toast("Mobile number is required", "error"); candidatePhone.focus(); return; }
+    if (!department) { toast("Department is required", "error"); candidateDept.focus(); return; }
+    if (!division) { toast("Division / Section is required", "error"); candidateDiv.focus(); return; }
+
+    startExamBtn.disabled = true;
+    startExamBtn.textContent = "Starting Exam...";
+
+    try {
+        let payload = { name, email, phone, department, division };
+        if (accessMode === "PRIVATE") payload.token = invitationToken;
+        else if (accessMode === "PUBLIC") payload.exam_code = publicExamCode;
+
+        const response = await api("/api/attempts", "POST", payload);
+        attemptId = response.attempt_id;
+
+        if (!attemptId) throw new Error("Server did not return an attempt ID.");
+
+        await buildState();
+
+        startView.hidden = true;
+        examView.hidden = false;
+
+        // Auto Fullscreen Request
+        try {
+            if (document.documentElement.requestFullscreen) {
+                await document.documentElement.requestFullscreen();
+            }
+        } catch (fsErr) {
+            console.warn("Fullscreen request warning:", fsErr);
+        }
+
+        // Initialize local client-side webcam feed (strictly local, no server storage)
+        initWebcam();
+
+        setupSecurity();
+        render();
+    } catch (error) {
+        console.error("Attempt start failed:", error);
+        toast("Failed to start exam: " + (error.message || error), "error");
+    } finally {
+        startExamBtn.disabled = false;
+        startExamBtn.textContent = "Start Exam →";
+    }
+}
+
+async function initWebcam() {
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 480 }, height: { ideal: 360 }, facingMode: "user" },
+            audio: false
+        });
+        const webcamPreview = document.getElementById("webcamPreview");
+        const webcamBox = document.getElementById("webcamBox");
+        if (webcamPreview && webcamBox) {
+            webcamPreview.srcObject = stream;
+            webcamBox.hidden = false;
+        }
+    } catch (err) {
+        console.warn("Camera access not granted or unavailable:", err);
+        toast("Camera proctoring notice: Camera access is disabled or unavailable.", "info");
+    }
+}
+
+// DevTools Window Dimension Trap (Active Exam Only)
+let devtoolsTrapLastTriggered = 0;
+setInterval(() => {
+    if (!attemptId || examView.hidden || window.examSubmitting) return;
+    const widthThreshold = window.outerWidth - window.innerWidth > 160;
+    const heightThreshold = window.outerHeight - window.innerHeight > 160;
+    if (widthThreshold || heightThreshold) {
+        const now = Date.now();
+        if (now - devtoolsTrapLastTriggered > 6000) {
+            devtoolsTrapLastTriggered = now;
+            handleCheatViolation("Developer Console Panel Opened", "devtools_opened");
+        }
+    }
+}, 1000);
+
+let cheatViolationCount = 0;
+const MAX_CHEAT_WARNINGS = 5;
+
+function handleCheatViolation(reason, eventType, metadata = {}) {
+    if (!attemptId || examView.hidden || window.examSubmitting) return;
+
+    cheatViolationCount++;
+
+    api("/api/attempts/" + encodeURIComponent(attemptId) + "/events", "POST", {
+        event_type: eventType,
+        metadata: { ...metadata, violation_count: cheatViolationCount, reason }
+    }).catch(console.error);
+
+    if (cheatViolationCount <= MAX_CHEAT_WARNINGS) {
+        const remaining = MAX_CHEAT_WARNINGS - cheatViolationCount;
+        const remainingMsg = remaining === 0
+            ? "FINAL WARNING! Next violation will force submit your exam!"
+            : `${remaining} warning${remaining > 1 ? 's' : ''} left before auto-submit.`;
+
+        toast(`⚠️ WARNING (${cheatViolationCount}/${MAX_CHEAT_WARNINGS}): ${reason}! ${remainingMsg}`, "error");
+    } else {
+        alert(`⚠️ CHEATING LIMIT EXCEEDED (5 Warnings Reached)!\n\nDue to repeated violations (${reason}), your exam is now being automatically submitted.`);
+        submit(true);
+    }
+}
+
+async function enforceFullscreen() {
+    if (!examView.hidden && attemptId && !window.examSubmitting && !document.fullscreenElement) {
+        try {
+            if (document.documentElement.requestFullscreen) {
+                await document.documentElement.requestFullscreen();
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                await document.documentElement.webkitRequestFullscreen();
+            }
+        } catch (err) {
+            // Silently restored on next user interaction
+        }
+    }
+}
+
+function setupSecurity() {
+    if (securityInitialized) return;
+    securityInitialized = true;
+
+    // 1. Fullscreen Exit Monitor & Direct Automatic Re-Fullscreen
+    document.addEventListener("fullscreenchange", () => {
+        if (examView.hidden || !attemptId || window.examSubmitting) return;
+        if (!document.fullscreenElement) {
+            enforceFullscreen();
+            handleCheatViolation("Exited Fullscreen Mode", "fullscreen_exit");
+        }
+    });
+
+    // Directly re-trigger fullscreen on ANY interaction seamlessly in background
+    ["click", "touchstart", "pointerdown", "keydown"].forEach(evt => {
+        document.addEventListener(evt, () => {
+            if (!examView.hidden && attemptId && !document.fullscreenElement && !window.examSubmitting) {
+                enforceFullscreen();
+            }
+        });
+    });
+
+    // 2. Tab / App Switch Monitor
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            handleCheatViolation("Tab or App Switch Detected", "tab_or_app_switch");
+        } else {
+            enforceFullscreen();
+        }
+    });
+
+    // 3. Window Blur Monitor
+    window.addEventListener("blur", () => {
+        handleCheatViolation("Exam Window Lost Focus", "window_blur");
+    });
+
+    // 4. Disable Copy, Paste, Cut, Contextmenu, Selection, Dragging (Active Exam Only)
+    for (const eventName of ["copy", "paste", "cut", "contextmenu", "selectstart", "dragstart"]) {
+        document.addEventListener(eventName, (e) => {
+            if (!attemptId || examView.hidden || window.examSubmitting) return;
+            e.preventDefault();
+            handleCheatViolation(`Attempted ${eventName}`, eventName + "_blocked");
+        });
+    }
+
+    // 5. Block Keyboard & DevTools Shortcuts (Active Exam Only)
+    document.addEventListener("keydown", (e) => {
+        if (!attemptId || examView.hidden || window.examSubmitting) return;
+        const k = e.key.toLowerCase();
+        if (
+            e.key === "F12" ||
+            (e.ctrlKey && e.shiftKey && ["i", "j", "c", "k", "e", "m", "i"].includes(k)) ||
+            ((e.ctrlKey || e.metaKey) && ["c", "v", "x", "p", "s", "u", "a"].includes(k))
+        ) {
+            e.preventDefault();
+            handleCheatViolation(`Developer Console / Inspect Shortcut (${e.key})`, "shortcut_blocked");
+        }
+    });
+
+    // 6. Mute Console Output to Prevent Data Inspection
+    try {
+        const noop = function() {};
+        window.console.log = noop;
+        window.console.warn = noop;
+        window.console.error = noop;
+        window.console.info = noop;
+        window.console.dir = noop;
+        window.console.table = noop;
+    } catch (e) {}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+async function buildState() {
+    const state = await api("/api/attempts/" + encodeURIComponent(attemptId));
+    const durationMs = Number(state.duration_minutes) * 60 * 1000;
+    const serverStart = new Date(state.attempt.start_time).getTime();
+    const elapsed = Date.now() - serverStart;
+
+    endAtMs = Date.now() + Math.max(0, durationMs - elapsed);
+
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(updateTimer, 500);
+    updateTimer();
+}
+
+function updateTimer() {
+    const left = Math.max(0, endAtMs - Date.now());
+    timer.textContent = formatMs(left);
+    if (left <= 0) {
+        clearInterval(timerInterval);
+        submit(true);
+    }
+}
+
+function formatMs(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const min = String(Math.floor(totalSec / 60)).padStart(2, "0");
+    const sec = String(totalSec % 60).padStart(2, "0");
+    return `${min}:${sec}`;
+}
+
+function render() {
+    if (!examData) return;
+    const questions = examData.questions || [];
+
+    if (!questions.length) {
+        qText.textContent = "No questions available.";
+        options.innerHTML = "";
+        return;
+    }
+
+    const question = questions[index];
+    progress.textContent = `Question ${index + 1} of ${questions.length}`;
+    qTypeBadge.textContent = question.type || "MCQ";
+    qText.textContent = question.text;
+
+    options.innerHTML = "";
+    const selected = answers[question.question_id] || [];
+    const opts = getOptions(question);
+
+    if (!opts.length) {
+        options.innerHTML = `<div class="empty" style="text-align: left; padding: 10px 0;">No options provided for this question.</div>`;
+    } else {
+        for (const option of opts) {
+            const label = document.createElement("label");
+            label.className = "answer-option";
+
+            const inputType = question.type === "MSQ" ? "checkbox" : "radio";
+            const checked = selected.includes(option.index);
+            const letter = String.fromCharCode(65 + (option.index >= 0 && option.index < 26 ? option.index : 0));
+
+            label.innerHTML = `
+                <input type="${inputType}" name="answer" value="${option.index}" ${checked ? "checked" : ""}>
+                <span class="option-badge">${letter}</span>
+                <span style="flex: 1; color: #1e293b; line-height: 1.5; font-size: 15px;">${escapeHtml(option.option_text)}</span>
+            `;
+
+            label.querySelector("input").addEventListener("change", saveCurrent);
+            options.appendChild(label);
+        }
+    }
+
+    /* Update status counters */
+    let answeredCount = 0;
+    questions.forEach(q => {
+        if ((answers[q.question_id] || []).length > 0) answeredCount++;
+    });
+    answeredBadge.textContent = `${answeredCount} Answered`;
+    unansweredBadge.textContent = `${questions.length - answeredCount} Remaining`;
+
+    /* Render Palette Matrix */
+    nav.innerHTML = questions.map((q, qIdx) => {
+        const sel = answers[q.question_id] || [];
+        return `
+            <button type="button" class="nav-dot ${sel.length ? "answered" : ""} ${qIdx === index ? "current" : ""}" onclick="go(${qIdx})">
+                ${qIdx + 1}
+            </button>
+        `;
+    }).join("");
+
+    prev.disabled = index === 0;
+    next.textContent = index === questions.length - 1 ? "Review & Submit →" : "Next Question →";
+}
+
+function getOptions(question) {
+    if (question.options && question.options.length > 0) {
+        return question.options.map((o, idx) => ({
+            index: (o.option_index !== undefined) ? o.option_index : ((o.index !== undefined) ? o.index : idx),
+            option_text: o.option_text || o.text || o.option || ""
+        }));
+    }
+    return [];
+}
+
+function saveCurrent() {
+    if (!examData || !examData.questions[index]) return;
+    const question = examData.questions[index];
+
+    const selected = [...document.querySelectorAll('input[name="answer"]:checked')].map(input => Number(input.value));
+    answers[question.question_id] = selected;
+
+    /* Update palette badges */
+    renderBadgesOnly();
+
+    api("/api/attempts/" + encodeURIComponent(attemptId) + "/answers", "PUT", {
+        answers: { [question.question_id]: selected }
+    }).catch(console.error);
+}
+
+function renderBadgesOnly() {
+    const questions = examData.questions || [];
+    let answeredCount = 0;
+    questions.forEach(q => {
+        if ((answers[q.question_id] || []).length > 0) answeredCount++;
+    });
+    answeredBadge.textContent = `${answeredCount} Answered`;
+    unansweredBadge.textContent = `${questions.length - answeredCount} Remaining`;
+
+    const currentDot = nav.children[index];
+    if (currentDot) {
+        const hasAns = (answers[questions[index].question_id] || []).length > 0;
+        if (hasAns) currentDot.classList.add("answered");
+        else currentDot.classList.remove("answered");
+    }
+}
+
+clearAnswerBtn.onclick = () => {
+    if (!examData || !examData.questions[index]) return;
+    const question = examData.questions[index];
+    delete answers[question.question_id];
+
+    document.querySelectorAll('input[name="answer"]').forEach(i => i.checked = false);
+    renderBadgesOnly();
+
+    api("/api/attempts/" + encodeURIComponent(attemptId) + "/answers", "PUT", {
+        answers: { [question.question_id]: [] }
+    }).catch(console.error);
+
+    toast("Response cleared");
+};
+
+togglePaletteBtn.onclick = () => {
+    const isHidden = navContainer.hidden;
+    navContainer.hidden = !isHidden;
+    togglePaletteBtn.textContent = isHidden ? "▲ Collapse Palette" : "▼ Expand Palette";
+};
+
+function go(qIdx) {
+    saveCurrent();
+    index = qIdx;
+    render();
+}
+
+next.onclick = () => {
+    saveCurrent();
+    if (index < examData.questions.length - 1) {
+        index++;
+        render();
+    } else {
+        submitBtn.scrollIntoView({ behavior: 'smooth' });
+    }
+};
+
+prev.onclick = () => {
+    saveCurrent();
+    if (index > 0) {
+        index--;
+        render();
+    }
+};
+
+async function submit(auto = false) {
+    if (!attemptId || window.examSubmitting) return;
+    window.examSubmitting = true;
+
+    try {
+        saveCurrent();
+        const response = await api("/api/attempts/" + encodeURIComponent(attemptId) + "/submit", "POST", { auto });
+        if (response.result_id) {
+            location = "/student/result/" + encodeURIComponent(response.result_id);
+        }
+    } catch (error) {
+        window.examSubmitting = false;
+        console.error("Exam submission failed:", error);
+        toast("Submission failed: " + (error.message || error), "error");
+    }
+}
+
+submitBtn.onclick = () => {
+    if (confirm("Are you sure you want to submit the examination?")) {
+        submit(false);
+    }
+};
+
+fullscreen.onclick = async () => {
+    try {
+        await document.documentElement.requestFullscreen?.();
+    } catch (error) {
+        console.warn("Fullscreen request failed:", error);
+    }
+};
+
+document.getElementById("startForm").addEventListener("submit", start);
+load();
+</script>
+
+{% endblock %}

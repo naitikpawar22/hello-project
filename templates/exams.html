@@ -1,0 +1,415 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+
+  <main class="content">
+    <header class="page-header" style="align-items: center; justify-content: space-between;">
+      <div>
+        <span class="eyebrow">EXAM OPERATIONS</span>
+        <h1>Exam Management</h1>
+        <p class="muted">Create, edit, toggle active status, copy test links, and manage all examinations.</p>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <a href="/admin/blank-exam-builder" class="btn btn-primary">
+          <span style="font-size: 16px; font-weight: bold;">+</span> Create Blank Exam
+        </a>
+        <a href="/admin/exam-builder" class="btn btn-secondary">
+          <span style="font-size: 16px; font-weight: bold;">+</span> Bank Exam Builder
+        </a>
+      </div>
+    </header>
+
+    <!-- Filter & Search Bar -->
+    <section class="panel" style="margin-bottom: 20px;">
+      <div class="inline-form" style="display: flex; gap: 12px; align-items: center;">
+        <input id="searchInput" placeholder="Search exam by title..." style="flex: 1; max-width: 450px;" />
+        <button id="searchBtn" type="button" class="btn btn-primary">
+          🔍 Search
+        </button>
+      </div>
+    </section>
+
+    <!-- Exam Management Table -->
+    <section class="panel">
+      <div id="examsTableContainer">
+        <div class="empty">Loading exams...</div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="paginationBar" class="inline-form" style="margin-top: 20px; justify-content: space-between; display: none;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <small class="muted">Per page:</small>
+          <select id="pageSizeSelect" style="width: auto; padding: 4px 10px;">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="25">25</option>
+          </select>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button id="prevBtn" class="btn btn-sm btn-secondary" disabled>&lt; Prev</button>
+          <span id="pageInfo" style="font-weight: 600; color: var(--text); font-size: 14px;">Page 1 of 1</span>
+          <button id="nextBtn" class="btn btn-sm btn-secondary" disabled>Next &gt;</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comprehensive Edit Exam Modal -->
+    <div id="editModal" class="modal-backdrop" hidden>
+      <div class="panel modal-content" style="max-width: 850px; max-height: 90vh; overflow-y: auto; margin: 40px auto; padding: 28px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 20px;">
+          <div>
+            <span class="eyebrow" style="color: var(--accent);">EXAM EDITOR</span>
+            <h2 style="margin: 2px 0 0 0; font-size: 22px;">Edit Examination & Questions</h2>
+          </div>
+          <button type="button" class="btn btn-sm btn-ghost" id="closeEditBtnTop" style="font-size: 18px;">✕</button>
+        </div>
+
+        <form id="editForm" class="stack" style="gap: 20px;">
+          <input type="hidden" id="editExamId" />
+
+          <!-- General Settings Grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; background: #f8fafc; padding: 18px; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <label style="grid-column: span 2;">Exam Title
+              <input id="editTitle" required style="font-weight: 700;" />
+            </label>
+
+            <label>Duration (minutes)
+              <input id="editDuration" type="number" min="1" required />
+            </label>
+
+            <label>Pass Percentage (%)
+              <input id="editPass" type="number" min="0" max="100" required />
+            </label>
+
+            <label style="grid-column: span 2;">Access Mode
+              <select id="editAccessMode">
+                <option value="PUBLIC">Public - Anyone with Link / Code</option>
+                <option value="PRIVATE">Private - Invitation Only</option>
+              </select>
+            </label>
+          </div>
+
+          <!-- Included Questions Section -->
+          <div style="margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <h3 style="font-size: 17px; margin: 0; display: flex; align-items: center; gap: 10px;">
+                <span>Included Questions</span>
+                <span class="badge ok" id="questionsCountBadge">0 Questions</span>
+              </h3>
+            </div>
+
+            <div id="editQuestionsList" class="stack" style="gap: 14px;">
+              <div class="empty">Loading questions...</div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+            <button type="button" class="btn btn-secondary" id="closeEditBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary" style="min-width: 150px;">Save Exam Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let rawExams = [];
+  let currentPage = 1;
+  let pageSize = 10;
+  let currentEditingExam = null;
+
+  requireAuth().then(loadExams);
+
+  async function loadExams() {
+    try {
+      const d = await api("/api/exams");
+      rawExams = d.exams || [];
+      renderTable();
+    } catch (err) {
+      console.error(err);
+      examsTableContainer.innerHTML = empty("Failed to load examinations.");
+    }
+  }
+
+  function getFilteredExams() {
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) return rawExams;
+    return rawExams.filter(e => (e.title || "").toLowerCase().includes(q));
+  }
+
+  function renderTable() {
+    const filtered = getFilteredExams();
+    if (!filtered.length) {
+      examsTableContainer.innerHTML = empty("No exams found.");
+      paginationBar.style.display = "none";
+      return;
+    }
+
+    const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const startIdx = (currentPage - 1) * pageSize;
+    const pageExams = filtered.slice(startIdx, startIdx + pageSize);
+
+    const rowsHtml = pageExams.map((e, idx) => {
+      const globalIdx = startIdx + idx + 1;
+      const statusUpper = (e.status || "").toUpperCase();
+      const isActive = statusUpper === "PUBLISHED" || statusUpper === "LIVE" || statusUpper === "SCHEDULED";
+      const examLink = e.exam_link || `${window.location.origin}/exam/${e.exam_code}`;
+
+      return `
+        <tr>
+          <td style="font-weight: 700; width: 50px;">${globalIdx}</td>
+          <td>
+            <div style="font-weight: 700; color: var(--text); font-size: 15px;">
+              📄 ${escapeHtml(e.title)}
+            </div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+              <span class="badge" style="background: rgba(79,70,229,0.1); color: var(--accent);">${e.question_count || 0} Questions</span>
+              <span>· ${e.duration_minutes} mins</span>
+              <span>· Pass ${e.pass_percentage}%</span>
+              <span>· ${e.access_mode || 'PUBLIC'}</span>
+            </div>
+          </td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <a href="${examLink}" target="_blank" class="btn btn-sm btn-secondary" style="color: var(--accent); text-decoration: none;">
+                Open Link
+              </a>
+              <button type="button" class="btn btn-sm btn-ghost" title="Copy Student Link" onclick="copyLink('${escapeHtml(examLink)}')">
+                📋
+              </button>
+            </div>
+          </td>
+          <td>
+            <label class="toggle-switch" style="display: inline-flex; align-items: center; cursor: pointer;">
+              <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleActive('${e.id}')" style="display: none;" />
+              <span class="switch-slider ${isActive ? 'active' : 'inactive'}">
+                ${isActive ? 'ACTIVE' : 'INACTIVE'}
+              </span>
+            </label>
+          </td>
+          <td>
+            <div class="action-group" style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-sm btn-secondary" title="Edit Exam & View Questions" onclick="openEditModal('${e.id}')">
+                ✏️ Edit
+              </button>
+              <a href="/exam/${e.exam_code}" target="_blank" class="btn btn-sm btn-secondary" title="Preview Exam">
+                👁️ Preview
+              </a>
+              <button type="button" class="btn btn-sm btn-danger" title="Delete Exam" onclick="confirmDelete('${e.id}', '${escapeHtml(e.title)}')">
+                🗑️ Delete
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    examsTableContainer.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 50px;">NO.</th>
+              <th>EXAM NAME</th>
+              <th>TEST LINK</th>
+              <th>STATUS</th>
+              <th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    paginationBar.style.display = "flex";
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+  }
+
+  /* Search listeners */
+  searchInput.oninput = () => { currentPage = 1; renderTable(); };
+  searchBtn.onclick = () => { currentPage = 1; renderTable(); };
+
+  /* Pagination listeners */
+  pageSizeSelect.onchange = () => {
+    pageSize = parseInt(pageSizeSelect.value, 10);
+    currentPage = 1;
+    renderTable();
+  };
+  prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; renderTable(); } };
+  nextBtn.onclick = () => {
+    const totalPages = Math.ceil(getFilteredExams().length / pageSize);
+    if (currentPage < totalPages) { currentPage++; renderTable(); }
+  };
+
+  /* Copy Link Function */
+  async function copyLink(link) {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast("Exam link copied to clipboard!");
+    } catch {
+      toast("Exam link: " + link);
+    }
+  }
+
+  /* Toggle Active/Inactive Status */
+  async function toggleActive(eid) {
+    try {
+      const res = await api(`/api/exams/${eid}/toggle-status`, "POST");
+      toast(`Exam status changed to ${res.status}`);
+      loadExams();
+    } catch (err) {
+      console.error(err);
+      toast("Failed to change exam status", "error");
+      loadExams();
+    }
+  }
+
+  /* Edit Modal Handling with Questions & Correct Options */
+  async function openEditModal(eid) {
+    editModal.hidden = false;
+    editQuestionsList.innerHTML = `<div class="empty">Loading questions and options...</div>`;
+
+    try {
+      const res = await api(`/api/exams/${eid}`);
+      const e = res.exam;
+      currentEditingExam = e;
+
+      editExamId.value = e.id;
+      editTitle.value = e.title || "";
+      editDuration.value = e.duration_minutes || 60;
+      editPass.value = e.pass_percentage || 40;
+      editAccessMode.value = e.access_mode || "PUBLIC";
+
+      renderEditQuestionsList(e.questions || []);
+    } catch (err) {
+      console.error(err);
+      toast("Failed to load exam details", "error");
+      editModal.hidden = true;
+    }
+  }
+
+  function renderEditQuestionsList(questions) {
+    questionsCountBadge.textContent = `${questions.length} Questions`;
+    if (!questions.length) {
+      editQuestionsList.innerHTML = `<div class="empty">No questions associated with this exam.</div>`;
+      return;
+    }
+
+    editQuestionsList.innerHTML = questions.map((q, idx) => {
+      const opts = q.options || [];
+      const optsHtml = opts.map((opt, oIdx) => {
+        const letter = String.fromCharCode(65 + oIdx);
+        const isCorrect = opt.is_correct === 1 || (q.correct !== undefined && (q.correct === opt.option_index || q.correct === oIdx));
+        return `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: ${isCorrect ? '#f0fdf4' : '#f8fafc'}; border: 1px solid ${isCorrect ? '#86efac' : '#e2e8f0'}; border-radius: 8px; font-size: 14px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <strong style="color: ${isCorrect ? '#16a34a' : 'var(--accent)'}; width: 22px; font-weight: 800;">${letter}.</strong>
+              <span style="color: #1e293b; font-weight: ${isCorrect ? '700' : '500'};">${escapeHtml(opt.option_text || '')}</span>
+            </div>
+            ${isCorrect ? `<span class="badge ok" style="font-size: 11px; padding: 3px 10px;">✓ CORRECT ANSWER</span>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div style="border: 1px solid var(--border); border-radius: 12px; padding: 18px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <strong style="color: var(--accent); font-size: 15px;">Q${idx + 1}.</strong>
+              <span class="badge" style="background: rgba(79,70,229,0.1); color: var(--accent);">${escapeHtml(q.topic || 'General')}</span>
+              <span class="badge" style="background: #f1f5f9;">${q.type || 'MCQ'}</span>
+              <span class="badge" style="background: #f1f5f9;">${q.marks || 1} Marks</span>
+            </div>
+          </div>
+
+          <div style="font-weight: 700; font-size: 16px; color: #0f172a; margin-bottom: 14px; line-height: 1.5;">
+            ${escapeHtml(q.text)}
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${optsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  closeEditBtn.onclick = () => { editModal.hidden = true; };
+  closeEditBtnTop.onclick = () => { editModal.hidden = true; };
+
+  editForm.onsubmit = async (evt) => {
+    evt.preventDefault();
+    const eid = editExamId.value;
+    try {
+      await api(`/api/exams/${eid}`, "PUT", {
+        title: editTitle.value.trim(),
+        duration_minutes: parseInt(editDuration.value, 10),
+        pass_percentage: parseInt(editPass.value, 10),
+        access_mode: editAccessMode.value,
+      });
+      toast("Exam updated successfully!");
+      editModal.hidden = true;
+      loadExams();
+    } catch (err) {
+      console.error(err);
+      toast("Failed to update exam", "error");
+    }
+  };
+
+  /* Confirm & Delete Exam */
+  async function confirmDelete(eid, title) {
+    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+    try {
+      const res = await api(`/api/exams/${eid}`, "DELETE");
+      toast(res.message || "Exam deleted.");
+      loadExams();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+</script>
+
+<style>
+  .toggle-switch {
+    user-select: none;
+  }
+  .switch-slider {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+  }
+  .switch-slider.active {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+  }
+  .switch-slider.inactive {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+  }
+  .modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(6px);
+    z-index: 1000;
+  }
+</style>
+{% endblock %}

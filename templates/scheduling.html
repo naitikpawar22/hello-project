@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+
+  <main class="content">
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">TIMING</span>
+        <h1>Scheduling</h1>
+      </div>
+    </header>
+
+    <section class="panel form-grid">
+      <label>
+        Exam
+        <select id="exam"></select>
+      </label>
+
+      <label>
+        Date
+        <input id="date" type="date" />
+      </label>
+
+      <label>
+        Time
+        <input id="time" type="time" />
+      </label>
+
+      <label>
+        Teacher email
+        <input id="teacherEmail" type="email" />
+      </label>
+
+      <button class="primary" id="save">Schedule</button>
+    </section>
+
+    <section class="panel">
+      <h2>Exam status</h2>
+      <div id="status">Loading...</div>
+    </section>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const examSelect = document.getElementById("exam");
+  const dateInput = document.getElementById("date");
+  const timeInput = document.getElementById("time");
+  const teacherEmailInput = document.getElementById("teacherEmail");
+  const saveButton = document.getElementById("save");
+  const statusBox = document.getElementById("status");
+
+  const preset = new URLSearchParams(location.search).get("exam");
+
+  requireAuth().then(load);
+
+  async function load() {
+    try {
+      const data = await api("/api/exams");
+
+      examSelect.innerHTML = data.exams
+        .map(
+          (e) => `
+            <option
+              value="${e.id}"
+              ${String(e.id) === String(preset) ? "selected" : ""}
+            >
+              ${escapeHtml(e.title)} (${e.status})
+            </option>
+          `
+        )
+        .join("");
+
+      await refresh();
+
+    } catch (error) {
+      console.error("Exam loading error:", error);
+      statusBox.textContent = "Unable to load exams.";
+    }
+  }
+
+  async function refresh() {
+    if (!examSelect.value) {
+      statusBox.textContent = "No exam selected";
+      return;
+    }
+
+    try {
+      const response = await api(
+        "/api/exams/" + examSelect.value + "/schedule"
+      );
+
+      console.log("Schedule response:", response);
+
+      if (!response.schedule) {
+        statusBox.textContent = "No schedule yet";
+        return;
+      }
+
+      const schedule = response.schedule;
+
+      statusBox.textContent =
+        `${String(schedule.state).toUpperCase()} · ` +
+        `${schedule.start_at} → ${schedule.end_at}`;
+
+    } catch (error) {
+      console.error("Schedule status error:", error);
+      statusBox.textContent = "No schedule yet";
+    }
+  }
+
+  saveButton.onclick = async () => {
+    try {
+      if (!examSelect.value) {
+        alert("Please select an exam.");
+        return;
+      }
+
+      if (!dateInput.value) {
+        alert("Please select a date.");
+        return;
+      }
+
+      if (!timeInput.value) {
+        alert("Please select a time.");
+        return;
+      }
+
+      saveButton.disabled = true;
+      saveButton.textContent = "Scheduling...";
+
+      const response = await api(
+        "/api/exams/" + examSelect.value + "/schedule",
+        "POST",
+        {
+          date: dateInput.value,
+          time: timeInput.value,
+          teacher_email: teacherEmailInput.value,
+        }
+      );
+
+      console.log("Schedule created:", response);
+
+      await refresh();
+
+      alert("Exam scheduled successfully!");
+
+    } catch (error) {
+      console.error("Schedule error:", error);
+
+      alert(
+        "Failed to schedule exam:\n\n" +
+        (error.message || error)
+      );
+
+    } finally {
+      saveButton.disabled = false;
+      saveButton.textContent = "Schedule";
+    }
+  };
+
+  examSelect.onchange = refresh;
+</script>
+{% endblock %}

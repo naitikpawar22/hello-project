@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+
+  <main class="content">
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">OUTCOMES & ANALYTICS</span>
+        <h1>Candidate Exam Results</h1>
+        <p class="muted">Review student exam scores, correct/wrong breakdowns, and detailed result cards.</p>
+      </div>
+    </header>
+
+    <!-- Results Overview Metrics -->
+    <div id="resultsStats" class="stat-grid" style="margin-bottom: 24px;"></div>
+
+    <!-- Result Analysis Smart Filters -->
+    <section class="panel" style="margin-bottom: 24px; background: #ffffff; border: 1px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: var(--shadow-sm);">
+      <div style="font-weight: 800; font-size: 13px; text-transform: uppercase; color: var(--accent); letter-spacing: 0.6px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <span style="display: flex; align-items: center; gap: 8px;">📊 RESULT ANALYSIS & SMART FILTERS</span>
+        <button id="resetFiltersBtn" type="button" class="btn btn-secondary btn-sm" style="font-weight: 700; border-radius: 8px;">
+          🔄 Reset Filters
+        </button>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: center;">
+        <div>
+          <label style="font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">🔍 Search Candidate</label>
+          <input id="searchFilter" placeholder="Name, email, phone..." style="width: 100%; min-height: 42px; border-radius: 10px;" />
+        </div>
+
+        <div>
+          <label style="font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">🎯 Status Filter</label>
+          <select id="statusFilter" style="width: 100%; min-height: 42px; border-radius: 10px; font-weight: 600;">
+            <option value="ALL">All Statuses</option>
+            <option value="PASS">✅ Pass Only</option>
+            <option value="FAIL">❌ Fail Only</option>
+            <option value="AUTO_SUBMITTED">⚠️ Auto Submitted (Cheating / Timeout)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">🏫 Department</label>
+          <select id="departmentFilter" style="width: 100%; min-height: 42px; border-radius: 10px; font-weight: 600;">
+            <option value="ALL">All Departments</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">🏢 Division</label>
+          <select id="divisionFilter" style="width: 100%; min-height: 42px; border-radius: 10px; font-weight: 600;">
+            <option value="ALL">All Divisions</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <span id="resultsCount" class="muted" style="font-size: 13px; font-weight: 700;"></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div id="resultsTableWrap">
+        <div class="empty">Loading exam results...</div>
+      </div>
+    </section>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let allResults = [];
+
+  requireAuth().then(loadResults);
+
+  async function loadResults() {
+    try {
+      const d = await api("/api/results");
+      allResults = d.results || [];
+      populateFilterDropdowns();
+      applyFilters();
+    } catch (err) {
+      console.error(err);
+      resultsTableWrap.innerHTML = empty("Failed to load exam results.");
+    }
+  }
+
+  function populateFilterDropdowns() {
+    const depts = new Set();
+    const divs = new Set();
+
+    allResults.forEach(r => {
+      if (r.candidate_department && r.candidate_department.trim()) {
+        depts.add(r.candidate_department.trim());
+      }
+      if (r.candidate_division && r.candidate_division.trim()) {
+        divs.add(r.candidate_division.trim());
+      }
+    });
+
+    departmentFilter.innerHTML = `<option value="ALL">All Departments (${depts.size})</option>` +
+      Array.from(depts).sort().map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+
+    divisionFilter.innerHTML = `<option value="ALL">All Divisions (${divs.size})</option>` +
+      Array.from(divs).sort().map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+  }
+
+  function applyFilters() {
+    const q = searchFilter.value.trim().toLowerCase();
+    const statusVal = statusFilter.value;
+    const deptVal = departmentFilter.value;
+    const divVal = divisionFilter.value;
+
+    const filtered = allResults.filter(r => {
+      // 1. Status Filter
+      if (statusVal === 'PASS' && !r.passed) return false;
+      if (statusVal === 'FAIL' && r.passed) return false;
+      if (statusVal === 'AUTO_SUBMITTED' && r.attempt_status !== 'AUTO_SUBMITTED') return false;
+
+      // 2. Department Filter
+      if (deptVal !== 'ALL' && (r.candidate_department || '').trim() !== deptVal) return false;
+
+      // 3. Division Filter
+      if (divVal !== 'ALL' && (r.candidate_division || '').trim() !== divVal) return false;
+
+      // 4. Text Search Filter
+      if (q) {
+        const text = [
+          r.candidate_name,
+          r.candidate_email,
+          r.candidate_phone,
+          r.candidate_department,
+          r.candidate_division,
+          r.exam_title
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (!text.includes(q)) return false;
+      }
+
+      return true;
+    });
+
+    renderSummaryStats(filtered);
+    renderResults(filtered);
+  }
+
+  // Event Listeners
+  searchFilter.oninput = applyFilters;
+  statusFilter.onchange = applyFilters;
+  departmentFilter.onchange = applyFilters;
+  divisionFilter.onchange = applyFilters;
+
+  resetFiltersBtn.onclick = () => {
+    searchFilter.value = '';
+    statusFilter.value = 'ALL';
+    departmentFilter.value = 'ALL';
+    divisionFilter.value = 'ALL';
+    applyFilters();
+  };
+
+
+  function renderSummaryStats(list) {
+    if (!list || !list.length) {
+      resultsStats.innerHTML = '';
+      return;
+    }
+
+    const total = list.length;
+    const passedCount = list.filter(r => r.passed).length;
+    const failedCount = total - passedCount;
+    const avgScore = list.reduce((acc, r) => acc + (r.percentage || 0), 0) / total;
+
+    resultsStats.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">📄 Total Submissions</div>
+        <div class="stat-value">${total}</div>
+        <small class="muted">Evaluated candidate attempts</small>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">✅ Successful Passes</div>
+        <div class="stat-value" style="color: var(--ok);">${passedCount}</div>
+        <small class="muted">${((passedCount / total) * 100).toFixed(1)}% pass rate</small>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">❌ Unsuccessful Attempts</div>
+        <div class="stat-value" style="color: var(--danger);">${failedCount}</div>
+        <small class="muted">${((failedCount / total) * 100).toFixed(1)}% fail rate</small>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">📊 Average Score</div>
+        <div class="stat-value" style="color: var(--cyan);">${avgScore.toFixed(1)}%</div>
+        <small class="muted">Across all completed exams</small>
+      </div>
+    `;
+  }
+
+  function renderResults(list) {
+    resultsCount.textContent = `Showing ${list.length} of ${allResults.length} records`;
+
+    if (!list || !list.length) {
+      resultsTableWrap.innerHTML = empty("No candidate results found.");
+      return;
+    }
+
+    const rowsHtml = list.map((r) => {
+      const isAutoSubmitted = r.attempt_status === "AUTO_SUBMITTED";
+      const passedBadge = isAutoSubmitted
+        ? `<span class="badge warning" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 800;">⚠️ AUTO SUBMITTED</span>`
+        : (r.passed ? `<span class="badge ok" style="font-weight: 800;">PASS</span>` : `<span class="badge danger" style="font-weight: 800;">FAIL</span>`);
+
+      const violationTag = r.security_event_count > 0
+        ? `<div style="font-size: 11px; color: #e11d48; font-weight: 700; margin-top: 4px;">⚠️ ${r.security_event_count} Cheating Violation${r.security_event_count > 1 ? 's' : ''}</div>`
+        : '';
+
+      return `
+        <tr>
+          <td>
+            <div style="font-weight: 700; color: #0f172a; font-size: 15px;">${escapeHtml(r.candidate_name)}</div>
+            <div style="font-size: 13px; color: var(--muted);">${escapeHtml(r.candidate_email)}</div>
+            ${r.candidate_phone ? `<div style="font-size: 12px; color: var(--accent); font-weight: 600;">📞 ${escapeHtml(r.candidate_phone)}</div>` : ''}
+            ${r.candidate_department || r.candidate_division ? `<div style="font-size: 11px; color: var(--muted);">🏫 ${escapeHtml(r.candidate_department || '')} ${r.candidate_division ? '· ' + escapeHtml(r.candidate_division) : ''}</div>` : ''}
+          </td>
+          <td>
+            <div style="font-weight: 600; color: #0f172a;">${escapeHtml(r.exam_title)}</div>
+            <div style="font-size: 11px; color: var(--muted);">${new Date(r.created_at || Date.now()).toLocaleDateString()}</div>
+          </td>
+          <td>
+            <div style="font-weight: 800; font-size: 16px; color: var(--cyan);">
+              ${Number(r.score).toFixed(2)} / ${Number(r.max_marks).toFixed(2)}
+            </div>
+            <div style="font-size: 12px; color: var(--muted); font-weight: 600;">${Number(r.percentage).toFixed(2)}%</div>
+          </td>
+          <td>
+            ${passedBadge}
+            ${violationTag}
+          </td>
+
+          <td>
+            <div style="font-size: 13px;">
+              <span style="color: var(--ok); font-weight: 700;">${r.correct_count} Correct</span> · 
+              <span style="color: var(--danger); font-weight: 700;">${r.wrong_count} Wrong</span> · 
+              <span style="color: var(--muted);">${r.skipped_count} Skipped</span>
+            </div>
+          </td>
+          <td>
+            <div class="action-group">
+              <a href="/admin/results/${r.id}" class="btn btn-sm btn-primary" target="_blank">View Details</a>
+              <a href="/api/results/public/${r.id}/pdf" class="btn btn-sm btn-secondary" target="_blank">PDF Receipt</a>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    resultsTableWrap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Candidate</th>
+              <th>Exam Title</th>
+              <th>Score & %</th>
+              <th>Status</th>
+              <th>Question Breakdown</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  searchFilter.oninput = () => {
+    const q = searchFilter.value.trim().toLowerCase();
+    if (!q) {
+      renderResults(allResults);
+      return;
+    }
+    const filtered = allResults.filter((r) =>
+      (r.candidate_name || "").toLowerCase().includes(q) ||
+      (r.candidate_email || "").toLowerCase().includes(q) ||
+      (r.exam_title || "").toLowerCase().includes(q)
+    );
+    renderResults(filtered);
+  };
+</script>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="app-shell">
+  {% include 'partials_nav.html' %}
+
+  <main class="content">
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">PEOPLE</span>
+        <h1>Students</h1>
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-primary"
+        onclick="document.getElementById('studentModal').showModal()"
+      >
+        Add student
+      </button>
+    </header>
+
+    <section class="panel">
+      <div class="toolbar">
+        <input
+          id="search"
+          placeholder="Search name, email, student code"
+          aria-label="Search students"
+        />
+
+        <select id="active" aria-label="Filter students by status">
+          <option value="">All</option>
+          <option value="1">Active</option>
+          <option value="0">Inactive</option>
+        </select>
+
+        <button
+          type="button"
+          class="btn btn-secondary"
+          id="refresh"
+        >
+          Refresh
+        </button>
+
+        <label class="btn btn-secondary upload-btn">
+          Import CSV
+          <input id="csvFile" type="file" accept=".csv" hidden />
+        </label>
+      </div>
+
+      <div id="studentTable"></div>
+    </section>
+  </main>
+</div>
+
+<dialog id="studentModal">
+  <form method="dialog" id="studentForm" class="panel">
+    <h2>Register student</h2>
+
+    <label>
+      Name
+      <input id="sname" required />
+    </label>
+
+    <label>
+      Email
+      <input id="semail" type="email" required />
+    </label>
+
+    <label>
+      Student code
+      <input id="scode" required />
+    </label>
+
+    <label>
+      Password (optional)
+      <input id="spass" type="password" />
+    </label>
+
+    <div class="dialog-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        onclick="document.getElementById('studentModal').close()"
+      >
+        Cancel
+      </button>
+
+      <button
+        class="btn btn-primary"
+        type="submit"
+      >
+        Save
+      </button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  requireAuth().then(loadStudents);
+
+  async function loadStudents() {
+    const q = new URLSearchParams({
+      q: search.value,
+      active: active.value,
+    });
+
+    const d = await api("/api/students?" + q);
+
+    studentTable.innerHTML = table(
+      d.students,
+      ["name", "email", "student_code", "active", "created_at"],
+      true,
+    );
+  }
+
+  search.oninput = loadStudents;
+  active.onchange = loadStudents;
+  refresh.onclick = loadStudents;
+
+  studentForm.onsubmit = async (e) => {
+    e.preventDefault();
+
+    const r = await api("/api/students", "POST", {
+      name: sname.value,
+      email: semail.value,
+      student_code: scode.value,
+      password: spass.value,
+    });
+
+    if (r.id) {
+      studentModal.close();
+      e.target.reset();
+      loadStudents();
+    }
+  };
+
+  csvFile.onchange = async () => {
+    if (!csvFile.files.length) return;
+
+    const fd = new FormData();
+    fd.append("file", csvFile.files[0]);
+
+    await apiForm("/api/students/import", fd);
+    csvFile.value = "";
+    loadStudents();
+  };
+</script>
+{% endblock %}
