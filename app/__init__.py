@@ -255,6 +255,7 @@ def create_app(test_config=None):
             "login.html"
         )
 
+<<<<<<< HEAD
     @app.get("/admin")
     @app.get("/admin/")
     def admin_root():
@@ -267,6 +268,15 @@ def create_app(test_config=None):
             "dashboard",
             "students",
             "question-banks",
+=======
+    @app.get("/admin/<page>")
+    def admin_page(page):
+        allowed_pages = {
+            "dashboard",
+            "students",
+            "question-banks",
+            "question-bank-detail",
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
             "exam-builder",
             "blank-exam-builder",
             "scheduling",
@@ -274,6 +284,7 @@ def create_app(test_config=None):
             "results",
         }
 
+<<<<<<< HEAD
         alias_map = {
             "questions": "question-banks",
         }
@@ -285,6 +296,15 @@ def create_app(test_config=None):
 
         return render_template(
             f"{target_page}.html",
+=======
+        if page not in allowed_pages:
+            return jsonify(
+                error="Page not found",
+            ), 404
+
+        return render_template(
+            f"{page}.html",
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         )
 
     @app.get("/student/exam/<token>")
@@ -294,6 +314,7 @@ def create_app(test_config=None):
             token=token,
         )
 
+<<<<<<< HEAD
     @app.get("/exam/<exam_code>")
     @app.get("/student/public/<exam_code>")
     @app.get("/student/public-exam/<exam_code>")
@@ -303,6 +324,8 @@ def create_app(test_config=None):
             exam_code=exam_code,
         )
 
+=======
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     @app.get("/student/result/<rid>")
     def student_result_page(rid):
         return render_template(
@@ -340,12 +363,18 @@ def create_app(test_config=None):
 
     @app.errorhandler(404)
     def not_found(_error):
+<<<<<<< HEAD
         from flask import request
         if request.path.startswith("/api/"):
             return jsonify(
                 error="Not found",
             ), 404
         return render_template("login.html"), 404
+=======
+        return jsonify(
+            error="Not found",
+        ), 404
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 
     @app.errorhandler(409)
     def conflict(_error):

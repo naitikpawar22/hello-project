@@ -4,7 +4,11 @@ def normalize_type(value):
     v=(value or "MCQ").strip().upper()
     return "MSQ" if v in {"MSQ","MULTIPLE","MULTIPLE SELECT","MULTI"} else "MCQ"
 
+<<<<<<< HEAD
 def normalize_answer(value, option_count, options=None):
+=======
+def normalize_answer(value, option_count):
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     if value is None: return []
     if isinstance(value,(list,tuple)): parts=list(value)
     else:
@@ -18,6 +22,7 @@ def normalize_answer(value, option_count, options=None):
     for part in parts:
         p=str(part).strip().upper()
         if not p: continue
+<<<<<<< HEAD
         idx = -1
         if len(p)==1 and "A"<=p<="Z": idx=ord(p)-65
         elif p.isdigit():
@@ -29,12 +34,22 @@ def normalize_answer(value, option_count, options=None):
                     idx = opt_i
                     break
                     
+=======
+        if len(p)==1 and "A"<=p<="Z": idx=ord(p)-65
+        elif p.isdigit():
+            n=int(p); idx=n if 0 <= n < option_count else n-1
+        else: continue
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
         if 0 <= idx < option_count and idx not in result: result.append(idx)
     return sorted(result)
 
 def make_question(text, options, answer, **kwargs):
     opts=[str(x).strip() for x in options if str(x).strip()]
+<<<<<<< HEAD
     correct=normalize_answer(answer,len(opts),options=opts)
+=======
+    correct=normalize_answer(answer,len(opts))
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     typ=normalize_type(kwargs.get("type"))
     review=0
     if len(opts)<2 or len(opts)>4 or not correct or (typ=="MCQ" and len(correct)!=1): review=1

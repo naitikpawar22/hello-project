@@ -10,11 +10,17 @@ bp=Blueprint("results",__name__,url_prefix="/api/results")
 @bp.get("")
 @admin_or_teacher_required
 def list_results(actor):
+<<<<<<< HEAD
     db=get_db(); sql="SELECT r.id,r.score,r.max_marks,r.percentage,r.passed,r.correct_count,r.wrong_count,r.skipped_count,r.created_at,a.candidate_name,a.candidate_email,a.candidate_phone,a.candidate_department,a.candidate_division,a.status AS attempt_status,a.security_event_count,e.title exam_title FROM results r JOIN attempts a ON a.id=r.attempt_id JOIN exams e ON e.id=r.exam_id WHERE 1=1"; p=[]
     if actor["role"]!="admin": sql+=" AND e.creator_id=?"; p.append(actor["id"])
     rows=db.execute(sql+" ORDER BY r.created_at DESC",p).fetchall(); return jsonify(results=[dict(r) for r in rows])
 
 
+=======
+    db=get_db(); sql="SELECT r.id,r.score,r.max_marks,r.percentage,r.passed,r.correct_count,r.wrong_count,r.skipped_count,r.created_at,a.candidate_name,a.candidate_email,e.title exam_title FROM results r JOIN attempts a ON a.id=r.attempt_id JOIN exams e ON e.id=r.exam_id WHERE 1=1"; p=[]
+    if actor["role"]!="admin": sql+=" AND e.creator_id=?"; p.append(actor["id"])
+    rows=db.execute(sql+" ORDER BY r.created_at DESC",p).fetchall(); return jsonify(results=[dict(r) for r in rows])
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 @bp.get("/<rid>")
 @admin_or_teacher_required
 def get_result(rid,actor):
@@ -39,6 +45,7 @@ def public_result_details(rid):
     r=result_detail(rid)
     if not r: return jsonify(error="Result not found"),404
     return jsonify(result=r)
+<<<<<<< HEAD
 
 @bp.get("/public/<rid>/pdf")
 def public_pdf(rid):
@@ -48,3 +55,5 @@ def public_pdf(rid):
     generate_result_pdf(r,path)
     return send_file(path,as_attachment=True,download_name=f"ExamForge_Result_{rid}.pdf",mimetype="application/pdf")
 
+=======
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b

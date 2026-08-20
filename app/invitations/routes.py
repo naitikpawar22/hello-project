@@ -12,7 +12,11 @@ from app.invitations.service import (
 from app.email.service import enqueue_email
 from app.utils.security import admin_or_teacher_required
 from app.utils.audit import audit
+<<<<<<< HEAD
 from app.utils.helpers import now_iso, get_shareable_url
+=======
+from app.utils.helpers import now_iso
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 
 
 bp = Blueprint(
@@ -103,12 +107,21 @@ def one(eid, actor):
             error=error
         ), 409
 
+<<<<<<< HEAD
     from app.utils.helpers import get_shareable_url
 
     invitation_id, token = result
 
     link = get_shareable_url(request, f"student/exam/{token}")
 
+=======
+    invitation_id, token = result
+
+    link = (
+        f"{request.url_root.rstrip('/')}"
+        f"/student/exam/{token}"
+    )
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 
     # -----------------------------------------------------
     # Email
@@ -405,10 +418,16 @@ def bulk(eid, actor):
                 }
                 for item in emails
             ],
+<<<<<<< HEAD
             get_shareable_url(request, "").rstrip("/"),
         )
 
 
+=======
+            request.host_url.rstrip("/"),
+        )
+
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
     except ValueError as e:
 
         return jsonify(

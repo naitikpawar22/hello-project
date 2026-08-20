@@ -6,14 +6,21 @@ from app.database import get_db
 from app.questions.service import parse_file, import_bank, serialize_question
 from app.utils.security import admin_or_teacher_required, admin_required
 from app.utils.audit import audit
+<<<<<<< HEAD
 from app.utils.helpers import now_iso, get_shareable_url
+=======
+from app.utils.helpers import now_iso
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 
 bp=Blueprint("questions",__name__,url_prefix="/api/question-banks")
 ALLOWED={"pdf","xml","html","htm","docx","xlsx","xlsm","csv"}
 
 def row_bank(row): return dict(row) if row else None
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 @bp.get("")
 @admin_or_teacher_required
 def banks(actor):
@@ -62,6 +69,7 @@ def update_bank(bid,actor):
     db.execute("UPDATE question_banks SET name=?,description=?,updated_at=? WHERE id=?",(data.get("name",row["name"]),data.get("description",row["description"]),now_iso(),bid)); db.commit()
     return jsonify(message="Question bank updated")
 
+<<<<<<< HEAD
 @bp.post("/<bid>/create-exam")
 @admin_or_teacher_required
 def create_exam_from_bank(bid, actor):
@@ -140,6 +148,8 @@ def add_question_to_bank(bid, actor):
     audit(actor, "question_added", "questions", qid, {"bank_id": bid})
     return jsonify(message="Question added successfully", id=qid), 201
 
+=======
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
 @bp.delete("/<bid>")
 @admin_or_teacher_required
 def delete_bank(bid,actor):

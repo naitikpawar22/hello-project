@@ -17,4 +17,8 @@ def reschedule(eid,actor): return schedule(eid,actor)
 @bp.get("/<eid>/schedule")
 @admin_or_teacher_required
 def schedule_status(eid,actor):
+<<<<<<< HEAD
     s=exam_window(eid); return jsonify(schedule=s),200
+=======
+    s=exam_window(eid); return (jsonify(schedule=s),200) if s else (jsonify(schedule=None),404)
+>>>>>>> 00cdc5ce5c2c164af42ff31e6595073d105d2b0b
